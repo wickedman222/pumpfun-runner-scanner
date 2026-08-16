@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 import time
 from dataclasses import dataclass
 
@@ -13,10 +14,15 @@ from .pump import latest_coins
 from .state import State
 from .telegram import boot_message, format_signal, send
 
+# Railway paints stderr red. Keep INFO on stdout so the dashboard stays white.
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
+    stream=sys.stdout,
+    force=True,
 )
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 log = logging.getLogger("runner")
 
 
