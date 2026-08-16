@@ -1,0 +1,9 @@
+.git
+.gitignore
+.venv
+venv
+data
+__pycache__
+*.md
+.env
+.env.example
