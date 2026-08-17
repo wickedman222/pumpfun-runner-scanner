@@ -20,7 +20,14 @@ CREATE TABLE IF NOT EXISTS seen_mints (
 CREATE TABLE IF NOT EXISTS posted (
     mint TEXT PRIMARY KEY,
     posted_at INTEGER,
-    symbol TEXT
+    symbol TEXT,
+    name TEXT,
+    url TEXT,
+    story TEXT,
+    entry_mc REAL,
+    ath_mc REAL,
+    last_mc REAL,
+    last_checked INTEGER
 );
 CREATE TABLE IF NOT EXISTS pending (
     mint TEXT PRIMARY KEY,
@@ -38,6 +45,23 @@ class State:
         self.path = path or os.path.join(config.DATA_DIR, "scanner.db")
         with self._conn() as con:
             con.executescript(SCHEMA)
+        self._migrate()
+
+    def _migrate(self) -> None:
+        wanted = {
+            "name": "TEXT",
+            "url": "TEXT",
+            "story": "TEXT",
+            "entry_mc": "REAL",
+            "ath_mc": "REAL",
+            "last_mc": "REAL",
+            "last_checked": "INTEGER",
+        }
+        with self._conn() as con:
+            existing = {row[1] for row in con.execute("PRAGMA table_info(posted)")}
+            for col, typ in wanted.items():
+                if col not in existing:
+                    con.execute(f"ALTER TABLE posted ADD COLUMN {col} {typ}")
 
     @contextmanager
     def _conn(self):
@@ -99,11 +123,48 @@ class State:
             row = con.execute("SELECT 1 FROM posted WHERE mint = ?", (mint,)).fetchone()
         return bool(row)
 
-    def mark_posted(self, mint: str, symbol: str) -> None:
+    def mark_posted(self, coin: dict, story_title: str = "") -> None:
+        now = int(time.time())
+        entry = float(coin.get("usd_market_cap") or 0)
+        ath = float(coin.get("ath_market_cap") or entry)
         with self._conn() as con:
             con.execute(
-                "INSERT OR REPLACE INTO posted(mint, posted_at, symbol) VALUES (?,?,?)",
-                (mint, int(time.time()), symbol),
+                """
+                INSERT OR REPLACE INTO posted(
+                    mint, posted_at, symbol, name, url, story,
+                    entry_mc, ath_mc, last_mc, last_checked
+                ) VALUES (?,?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    coin.get("mint") or "",
+                    now,
+                    (coin.get("symbol") or "").upper(),
+                    coin.get("name") or "",
+                    coin.get("url") or "",
+                    story_title or "",
+                    entry,
+                    max(ath, entry),
+                    entry,
+                    now,
+                ),
+            )
+
+    def list_posted(self) -> list[dict]:
+        with self._conn() as con:
+            rows = con.execute(
+                "SELECT * FROM posted ORDER BY posted_at ASC"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def update_quotes(self, mint: str, last_mc: float, ath_mc: float) -> None:
+        with self._conn() as con:
+            con.execute(
+                """
+                UPDATE posted
+                SET last_mc = ?, ath_mc = ?, last_checked = ?
+                WHERE mint = ?
+                """,
+                (last_mc, ath_mc, int(time.time()), mint),
             )
 
     def signals_today(self) -> int:

@@ -44,7 +44,7 @@ async def evaluate_new(http: httpx.AsyncClient, attention: Attention, state: Sta
     mint = coin["mint"]
     v = Verdict(post=False, mint=mint, coin=coin)
 
-    if state.signals_today() >= config.MAX_SIGNALS_PER_DAY:
+    if config.MAX_SIGNALS_PER_DAY > 0 and state.signals_today() >= config.MAX_SIGNALS_PER_DAY:
         v.failed_gate = "quota"
         v.fail_reason = "daily signal cap reached"
         return v

@@ -10,9 +10,9 @@ from . import config, health
 from .attention import Attention
 from .engine import Verdict, confirm_expansion, evaluate_new
 from .httputil import client
-from .pump import latest_coins
+from .pump import fetch_coin, latest_coins
 from .state import State
-from .telegram import boot_message, format_signal, send
+from .telegram import boot_message, format_leaderboard, format_signal, send
 
 # Railway paints stderr red. Keep INFO on stdout so the dashboard stays white.
 logging.basicConfig(
@@ -41,7 +41,7 @@ async def run() -> None:
     attention = Attention()
     pending: dict[str, Pending] = {}
     last_attention = 0.0
-    last_heartbeat = time.time()
+    last_leaderboard = time.time()
 
     health.STATUS["ok"] = True
     health.start(config.PORT)
@@ -56,10 +56,10 @@ async def run() -> None:
             log.warning("Initial attention refresh failed: %s", exc)
 
         log.info(
-            "Scanner loop started. poll=%ss wait=%ss max/day=%s",
+            "Scanner loop started. poll=%ss wait=%ss no daily cap · board every %sh",
             config.PUMP_POLL_SEC,
             config.EXPANSION_WAIT_SEC,
-            config.MAX_SIGNALS_PER_DAY,
+            config.LEADERBOARD_SEC // 3600,
         )
 
         while True:
@@ -130,22 +130,18 @@ async def run() -> None:
                     text = format_signal(v, why)
                     sent = await send(http, text, preview=True)
                     if sent:
-                        state.mark_posted(mint, fresh.get("symbol") or "")
-                        health.STATUS["posted"] = state.signals_today()
+                        story_title = ""
+                        if item.coin.get("_story") is not None:
+                            story_title = getattr(item.coin["_story"], "title", "") or ""
+                        state.mark_posted(fresh, story_title)
+                        health.STATUS["posted"] = len(state.list_posted())
                         log.info("POSTED %s — %s", fresh.get("symbol"), why)
                     else:
                         log.error("Failed to post %s", fresh.get("symbol"))
 
-                if config.HEARTBEAT_SEC and time.time() - last_heartbeat >= config.HEARTBEAT_SEC:
-                    await send(
-                        http,
-                        (
-                            f"scanner alive · seen {health.STATUS.get('seen', 0)} "
-                            f"· posted today {state.signals_today()} "
-                            f"· headlines {len(attention.stories)}"
-                        ),
-                    )
-                    last_heartbeat = time.time()
+                if time.time() - last_leaderboard >= config.LEADERBOARD_SEC:
+                    await _send_leaderboard(http, state, attention, health.STATUS.get("seen", 0))
+                    last_leaderboard = time.time()
 
                 health.STATUS["last_error"] = ""
             except Exception as exc:
@@ -154,6 +150,28 @@ async def run() -> None:
 
             elapsed = time.time() - loop_start
             await asyncio.sleep(max(1.0, config.PUMP_POLL_SEC - elapsed))
+
+
+async def _send_leaderboard(http, state: State, attention, scanned: int) -> None:
+    rows = state.list_posted()
+    for row in rows:
+        mint = row.get("mint")
+        if not mint:
+            continue
+        coin = await fetch_coin(http, mint)
+        if not coin:
+            continue
+        last = float(coin.get("usd_market_cap") or 0)
+        ath = float(coin.get("ath_market_cap") or last)
+        prev_ath = float(row.get("ath_mc") or 0)
+        state.update_quotes(mint, last, max(ath, prev_ath, last))
+    rows = state.list_posted()
+    text = format_leaderboard(rows, scanned, len(attention.stories))
+    ok = await send(http, text)
+    if ok:
+        log.info("Leaderboard sent (%s tracked)", len(rows))
+    else:
+        log.error("Leaderboard send failed")
 
 
 def main() -> None:

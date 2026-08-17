@@ -95,12 +95,71 @@ def format_signal(v: Verdict, expansion: str) -> str:
     return "\n".join(lines)
 
 
+def _fmt_usd(value: float) -> str:
+    if value >= 1_000_000:
+        return f"${value/1_000_000:.2f}M"
+    if value >= 1_000:
+        return f"${value/1_000:.1f}k"
+    return f"${value:,.0f}"
+
+
+def _fmt_x(mult: float) -> str:
+    if mult >= 100:
+        return f"{mult:.0f}x"
+    if mult >= 10:
+        return f"{mult:.1f}x"
+    return f"{mult:.2f}x"
+
+
+def format_leaderboard(rows: list[dict], scanned: int, headlines: int) -> str:
+    lines = [
+        "<b>ALL-TIME LEADERBOARD</b>",
+        "Best ATH multiple from our calls",
+        "",
+    ]
+    if not rows:
+        lines += [
+            "No calls yet.",
+            "I only post when every runner gate passes — no daily cap.",
+        ]
+    else:
+        ranked = []
+        for row in rows:
+            entry = float(row.get("entry_mc") or 0)
+            ath = float(row.get("ath_mc") or row.get("last_mc") or 0)
+            last = float(row.get("last_mc") or 0)
+            if entry <= 0:
+                continue
+            ranked.append({**row, "mult": ath / entry, "now_mult": last / entry if last else 0})
+        ranked.sort(key=lambda r: r["mult"], reverse=True)
+        for i, row in enumerate(ranked[: config.LEADERBOARD_SIZE], start=1):
+            symbol = _esc(row.get("symbol") or "?")
+            url = row.get("url") or ""
+            name = f"${symbol}"
+            if url:
+                name = f"<a href=\"{_esc(url)}\">${symbol}</a>"
+            lines.append(
+                f"{i}. {name}  <b>{_esc(_fmt_x(row['mult']))}</b>  "
+                f"ATH {_esc(_fmt_usd(row['ath_mc'] or 0))}  "
+                f"now {_esc(_fmt_usd(row['last_mc'] or 0))}"
+            )
+        lines += [
+            "",
+            f"{len(rows)} call{'s' if len(rows) != 1 else ''} tracked · top {min(config.LEADERBOARD_SIZE, len(ranked))} by ATH x",
+        ]
+    lines += [
+        "",
+        f"<i>headlines {headlines} · new mints seen {scanned}</i>",
+    ]
+    return "\n".join(lines)
+
+
 async def boot_message(http: httpx.AsyncClient) -> None:
     text = (
         "<b>Pump.fun runner scanner online</b>\n"
-        "Attention-first. I only post if every gate passes.\n"
-        f"Max {config.MAX_SIGNALS_PER_DAY}/day · expansion wait {config.EXPANSION_WAIT_SEC}s\n"
-        "Empty days are expected."
+        "Attention-first. I only post if it looks like a real runner.\n"
+        "No daily cap — gates decide.\n"
+        f"Leaderboard every {config.LEADERBOARD_SEC // 3600}h · wait {config.EXPANSION_WAIT_SEC}s"
     )
     ok = await send(http, text)
     if ok:

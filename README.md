@@ -47,8 +47,11 @@ On a healthy boot the channel gets:
 
 ```
 Pump.fun runner scanner online
-Attention-first. I only post if every gate passes.
+Attention-first. I only post if it looks like a real runner.
+No daily cap — gates decide.
 ```
+
+Every 6 hours it also posts an **all-time top 15** of calls ranked by ATH multiple (the x from the price when we posted).
 
 If that message does not arrive: token is wrong, bot is not in the channel, or chat id is wrong.
 
@@ -56,7 +59,8 @@ If that message does not arrive: token is wrong, bot is not in the channel, or c
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `MAX_SIGNALS_PER_DAY` | `6` | Hard cap so the channel stays quiet |
+| `LEADERBOARD_SEC` | `21600` | Hours between all-time top-15 boards (default 6h) |
+| `LEADERBOARD_SIZE` | `15` | How many names on the board |
 | `EXPANSION_WAIT_SEC` | `180` | Wait after first match before posting |
 | `PUMP_POLL_SEC` | `12` | How often new Pump.fun mints are pulled |
 | `ATTENTION_POLL_SEC` | `120` | How often news/reddit is refreshed |
