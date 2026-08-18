@@ -77,7 +77,7 @@ Starts at **2 SOL** (not real). A call buys **7.5% of equity** (0.15 SOL at the 
 | **10x** | Sell half the moonbag |
 | After 2x, −50% off post-entry ATH | Trail the rest |
 
-Size grows if the book grows, shrinks if it draws down. Set `PAPER_ENABLED=0` to turn it off. `PAPER_START_SOL` only applies on first boot of an empty wallet.
+Size grows if the book grows, shrinks if it draws down. Telegram gets a **paper balance report every 2 hours**. Set `PAPER_ENABLED=0` to turn it off. `PAPER_START_SOL` only applies on first boot of an empty wallet. `PAPER_REPORT_SEC` defaults to `7200`.
 
 If that message does not arrive: token is wrong, bot is not in the channel, or chat id is wrong.
 

@@ -123,6 +123,7 @@ PAPER_TP2_SELL = _float("PAPER_TP2_SELL", 0.30)  # of original; leaves ~30% moon
 PAPER_TP3_MULT = _float("PAPER_TP3_MULT", 10.0)
 PAPER_TP3_SELL = _float("PAPER_TP3_SELL", 0.15)  # half the moonbag
 PAPER_TRAIL_GIVEBACK = _float("PAPER_TRAIL_GIVEBACK", 0.50)  # sell rest if −50% off post-entry ATH after TP1
+PAPER_REPORT_SEC = _int("PAPER_REPORT_SEC", 2 * 3600)
 
 # Known AMM / pool authorities — not "holders"
 LP_OWNERS = {

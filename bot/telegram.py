@@ -242,7 +242,7 @@ async def boot_message(http: httpx.AsyncClient) -> None:
         "<b>Pump.fun runner scanner online</b>\n"
         "Calls: character/culture first-mover, live crowd, or a tight news map.\n"
         "USWS-class painted books stay banned. Not every BOOST coin.\n"
-        f"Leaderboard every {config.LEADERBOARD_SEC // 3600}h"
+        f"Leaderboard every {config.LEADERBOARD_SEC // 3600}h · paper balance every {config.PAPER_REPORT_SEC // 3600}h"
     )
     if config.PAPER_ENABLED:
         text += (

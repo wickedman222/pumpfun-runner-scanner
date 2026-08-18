@@ -52,6 +52,7 @@ async def run() -> None:
     pending: dict[str, Pending] = {}
     last_attention = 0.0
     last_leaderboard = time.time()
+    last_paper_report = time.time()
 
     health.STATUS["ok"] = True
     health.start(config.PORT)
@@ -153,6 +154,9 @@ async def run() -> None:
 
                 if config.PAPER_ENABLED:
                     await _manage_paper(http, state)
+                    if time.time() - last_paper_report >= config.PAPER_REPORT_SEC:
+                        await _send_paper_report(http, state)
+                        last_paper_report = time.time()
 
                 if time.time() - last_leaderboard >= config.LEADERBOARD_SEC:
                     await _send_leaderboard(http, state, attention, health.STATUS.get("seen", 0))
@@ -219,6 +223,34 @@ async def _send_leaderboard(http, state: State, attention, scanned: int) -> None
         sent_book = await send(http, book)
         if sent_book:
             log.info("Paper book sent (equity %.3f)", snap["equity"])
+
+
+async def _refresh_paper_marks(http, state: State) -> None:
+    for pos in state.open_paper_positions():
+        mint = pos.get("mint")
+        if not mint:
+            continue
+        coin = await fetch_coin(http, mint)
+        if not coin:
+            continue
+        last = float(coin.get("usd_market_cap") or 0)
+        if last <= 0:
+            continue
+        ath = max(float(pos.get("ath_mc") or 0), float(coin.get("ath_market_cap") or 0), last)
+        pos["last_mc"] = last
+        pos["ath_mc"] = ath
+        state.upsert_paper_position(pos)
+
+
+async def _send_paper_report(http, state: State) -> None:
+    await _refresh_paper_marks(http, state)
+    snap = paper.snapshot(state)
+    health.STATUS["paper_equity"] = round(snap["equity"], 4)
+    ok = await send(http, format_paper_book(snap))
+    if ok:
+        log.info("Paper balance report sent (equity %.3f)", snap["equity"])
+    else:
+        log.error("Paper balance report failed")
 
 
 async def _manage_paper(http, state: State) -> None:
