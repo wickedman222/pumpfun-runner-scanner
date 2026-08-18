@@ -25,7 +25,7 @@ Never:
 - BOOST with **no** character, site, or live crowd (painted one-way tape)
 - Mayhem
 - Copy-ticker farms
-- First look already above ~$80k
+- First look already above ~$200k (just-graduated runners are allowed; $1M chases are not)
 - Serial-rug / bundled structure
 
 Empty on-site chat is normal in 2026. The scam tell is the USWS chart (ATH glued to spot, acronym, no identity), not BOOST by itself.
@@ -66,7 +66,7 @@ Every 6 hours it also posts an **all-time top 15** of calls ranked by ATH multip
 
 ## Paper book
 
-Starts at **2 SOL** (not real). A call buys **7.5% of equity** (0.15 SOL at the start, floored at 0.10, capped at 0.20). Max **4** open names. Fills assume 1% fee, 8% entry slip, 5% exit slip.
+Starts at **2 SOL** (not real). A call buys **7.5% of equity** (0.15 SOL at the start, floored at 0.10, capped at 0.20). Above $80k MC the size is 70% (still take the graduate). Hard skip only above ~$200k. Max **3** open names. Fills assume 1% fee, 8% entry slip, 5% exit slip.
 
 | Level | Action |
 |---|---|

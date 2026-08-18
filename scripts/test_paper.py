@@ -34,6 +34,8 @@ def main() -> None:
     st.ensure_paper_wallet(2.0)
 
     assert abs(buy_size(2.0) - 0.15) < 1e-9, buy_size(2.0)
+    assert abs(buy_size(2.0, 75_000) - 0.15) < 1e-9, buy_size(2.0, 75_000)
+    assert abs(buy_size(2.0, 120_000) - 0.105) < 1e-9, buy_size(2.0, 120_000)
     assert buy_size(1.2) == 0.10
     assert buy_size(4.0) == 0.20
     assert buy_size(0.2) == 0.0

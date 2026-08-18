@@ -28,11 +28,14 @@ class Fill:
     equity: float
 
 
-def buy_size(equity: float) -> float:
+def buy_size(equity: float, mc: float = 0.0) -> float:
     if equity < config.PAPER_MIN_EQUITY:
         return 0.0
     size = equity * config.PAPER_SIZE_FRAC
     size = max(config.PAPER_SIZE_MIN, min(config.PAPER_SIZE_MAX, size))
+    # Still take the just-graduated runner, but do not full-send a $150k local top.
+    if mc > config.PAPER_FULL_SIZE_MC:
+        size = max(config.PAPER_SIZE_MIN * 0.8, size * 0.7)
     return round(size, 3)
 
 
@@ -77,7 +80,7 @@ def try_open(state: State, coin: dict, path: str = "") -> Fill | None:
     if len(opens) >= config.PAPER_MAX_OPEN:
         log.info("Paper skip %s — already %s open", coin.get("symbol"), len(opens))
         return None
-    size = snap["size"]
+    size = buy_size(snap["equity"], float(coin.get("usd_market_cap") or 0))
     if size <= 0 or snap["cash"] < size:
         log.info("Paper skip %s — cash %.3f size %.3f", coin.get("symbol"), snap["cash"], size)
         return None

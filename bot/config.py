@@ -97,8 +97,12 @@ MAX_INSIDER_PCT = _float("MAX_INSIDER_PCT", 20.0)
 MAX_RUGCHECK_SCORE = _int("MAX_RUGCHECK_SCORE", 1500)
 MIN_UNIQUE_HOLDERS = _int("MIN_UNIQUE_HOLDERS", 25)
 MIN_MATCH_SCORE = _int("MIN_MATCH_SCORE", 90)
-# First look above this is already late (the run already happened).
-MAX_FIRST_LOOK_MC = _float("MAX_FIRST_LOOK_MC", 80_000)
+# Hard chase-line only. Graduation is ~$69k — an $80k cap cuts off the
+# "just graduated and still running" names that actually build a 2 SOL book.
+# Above ~$200k a 4x is already a $800k+ coin; that is a different trade.
+MAX_FIRST_LOOK_MC = _float("MAX_FIRST_LOOK_MC", 200_000)
+# Full paper size at/under this. Between here and MAX_FIRST_LOOK we size down.
+PAPER_FULL_SIZE_MC = _float("PAPER_FULL_SIZE_MC", 80_000)
 # Copy farms (USWS/EYE style) — skip the whole ticker family, do not promote the original.
 META_COPY_MIN = _int("META_COPY_MIN", 2)
 
