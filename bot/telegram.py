@@ -158,7 +158,7 @@ async def boot_message(http: httpx.AsyncClient) -> None:
     text = (
         "<b>Pump.fun runner scanner online</b>\n"
         "Calls: tight real-world story, or a clean live stream.\n"
-        "BOOST / cashback / fake-fund / dead-chat books are never called.\n"
+        "BOOST / Mayhem / fake-fund books are never called.\n"
         f"Leaderboard every {config.LEADERBOARD_SEC // 3600}h"
     )
     ok = await send(http, text)

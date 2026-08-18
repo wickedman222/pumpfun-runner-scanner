@@ -15,18 +15,17 @@ Repo: [github.com/wickedman222/pumpfun-runner-scanner](https://github.com/wicked
 Every gate must pass. A call comes from one of two **real** paths:
 
 1. **Tight news map** — the token *is* the headline (PNUT / Moo Deng). Shared words and crypto price articles do not count.
-2. **Clean livestream** — first mint, still live, BOOST/cashback **off**, book not a farm. This is how a lot of 2025–26 organic runners actually started.
+2. **Clean livestream** — first mint, still live, BOOST **off**. This is how a lot of 2025–26 organic runners actually started.
 
 Never:
 
-- BOOST / Mayhem / cashback painted books (USWS, EYE, UOTF, WWR, Z500…)
+- BOOST / Mayhem painted books (USWS, EYE, UOTF, WWR, Z500…)
 - Fake US fund/reserve names
 - Copy-ticker farms
-- Big MC + **zero replies** or ATH≈spot tape
 - First look already above ~$80k
 - Serial-rug / bundled structure
 
-Historical real names (GOAT, PNUT, MOODENG, FARTCOIN, FWOG) were `boost_mode=NONE` with real chat. The $100M “runners” from Aug 2026 were `boost_mode=COMPLETED` and 0 replies.
+2026 homepage runners (ANSEM, CHONKETHA, JIMOTHY, TBB, KET) are `boost_mode=NONE` and often have **0 on-site replies**. Empty chat is not a farm signal anymore. The $100M honeypot tapes are `boost_mode=COMPLETED`.
 
 Generic tickers (`PEPE`, `CAT`, `MOON`, …) are ignored on purpose.
 

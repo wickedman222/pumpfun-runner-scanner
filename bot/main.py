@@ -10,7 +10,7 @@ from . import config, health
 from .attention import Attention
 from .engine import Verdict, confirm_expansion, evaluate_new
 from .httputil import client
-from .pump import fetch_coin, latest_coins, live_coins
+from .pump import active_coins, age_seconds, fetch_coin, latest_coins, live_coins
 from .state import State
 from .telegram import boot_message, format_leaderboard, format_signal, send
 
@@ -72,8 +72,9 @@ async def run() -> None:
 
                 fresh = await latest_coins(http, limit=40)
                 streaming = await live_coins(http, limit=20)
+                trading = await active_coins(http, limit=30)
                 seen_this_loop: set[str] = set()
-                for coin in fresh + streaming:
+                for coin in fresh + streaming + trading:
                     mint = coin.get("mint")
                     if not mint or mint in seen_this_loop:
                         continue
@@ -83,16 +84,20 @@ async def run() -> None:
                         health.STATUS["seen"] = health.STATUS.get("seen", 0) + 1
                     if state.already_posted(mint) or mint in pending:
                         continue
-                    # Re-check already-seen coins only if they just went live.
+                    # Birth-shot is not enough: homepage runners often print 1–6h later.
                     if not is_new and not coin.get("is_currently_live"):
-                        continue
+                        age = age_seconds(coin, time.time())
+                        usd = float(coin.get("usd_market_cap") or 0)
+                        if age > config.MAX_ACTIVE_AGE_SEC or usd > config.MAX_FIRST_LOOK_MC:
+                            continue
 
                     verdict = await evaluate_new(http, attention, state, coin)
                     if verdict.failed_gate == "first-mover":
                         log.info("Skip %s first-mover: %s", coin.get("symbol"), verdict.fail_reason)
                         continue
                     if verdict.failed_gate == "farm":
-                        log.info("Skip %s farm: %s", coin.get("symbol"), verdict.fail_reason)
+                        if is_new:
+                            log.info("Skip %s farm: %s", coin.get("symbol"), verdict.fail_reason)
                         continue
                     if verdict.failed_gate in {"attention", "generic", "age", "quota", "late", "dumped"}:
                         continue

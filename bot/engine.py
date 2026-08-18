@@ -70,14 +70,6 @@ async def evaluate_new(
         v.fail_reason = "daily signal cap reached"
         return v
 
-    age = age_seconds(coin, time.time())
-    live = bool(coin.get("is_currently_live"))
-    max_age = config.MAX_LIVE_AGE_SEC if live else config.MAX_TOKEN_AGE_SEC
-    if age > max_age:
-        v.failed_gate = "age"
-        v.fail_reason = f"too old ({age/60:.0f}m)"
-        return v
-
     if is_generic_ticker(coin.get("symbol", ""), coin.get("name", "")):
         v.failed_gate = "generic"
         v.fail_reason = "generic ticker/name"
@@ -87,6 +79,16 @@ async def evaluate_new(
     if farm:
         v.failed_gate = "farm"
         v.fail_reason = farm
+        return v
+
+    age = age_seconds(coin, time.time())
+    live = bool(coin.get("is_currently_live"))
+    max_age = config.MAX_LIVE_AGE_SEC if live else config.MAX_TOKEN_AGE_SEC
+    # Organic (non-BOOST) books can sit on the homepage for hours before they print.
+    max_age = max(max_age, config.MAX_ACTIVE_AGE_SEC)
+    if age > max_age:
+        v.failed_gate = "age"
+        v.fail_reason = f"too old ({age/60:.0f}m)"
         return v
 
     if ath > 8_000 and usd < 0.4 * ath:
@@ -134,7 +136,7 @@ async def evaluate_new(
         story, match_score = hits[0]
     elif live:
         # 2025–26 real runners often started as a live stream, not a newspaper.
-        # Still banned if BOOST/cashback/dead-chat already fired above.
+        # Still banned if BOOST/Mayhem/fake-official already fired above.
         path = "live"
         match_score = 85
         title = coin.get("livestream_title") or coin.get("name") or coin.get("symbol")

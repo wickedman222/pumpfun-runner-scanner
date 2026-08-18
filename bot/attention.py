@@ -136,28 +136,20 @@ def _boost_on(coin: dict) -> bool:
 
 
 def extract_farm_reason(coin: dict) -> str:
-    """Painted book / wash / fake-official. Pump contracts look clean; these still are not calls.
+    """Painted book / fake-official. Pump contracts look clean; these still are not calls.
 
-    Live check (Aug 2026): USWS/EYE/UOTF/WWR/NTDA all had boost_mode=COMPLETED,
-    0 replies, and ATH≈spot. Real coins (Fartcoin, WOULD) are boost_mode=NONE
-    with thousands of comments. The chart looks like a honeypot because BOOST
-    + volume bots buy and almost never let the book trade freely.
+    USWS/EYE/UOTF class = boost_mode=COMPLETED (or Mayhem). That is the honeypot tape.
+    2026 homepage runners (ANSEM, CHONKETHA, JIMOTHY, TBB, KET) are boost_mode=NONE
+    and often have 0 on-site replies — chat moved to X / live / TG. Do not treat
+    empty comments or cashback-alone as a farm.
     """
-    usd = float(coin.get("usd_market_cap") or 0)
-    ath = float(coin.get("ath_market_cap") or usd or 0)
-    replies = int(coin.get("reply_count") or 0)
     if is_fake_official(coin.get("symbol") or "", coin.get("name") or ""):
         return "fake official / fund-reserve meta"
     if _boost_on(coin):
         return f"boost/mayhem painted book ({coin.get('boost_mode')})"
-    if coin.get("is_cashback_enabled"):
-        return "cashback-boosted book"
-    # Real runners have chat. $20k+ with zero replies is wash.
-    if usd >= 20_000 and replies <= 0:
-        return f"dead chat at ${usd:,.0f} (0 replies)"
-    # Honeypot-looking tape: already large, never retraced, no chat.
-    if usd >= 50_000 and ath > 0 and usd >= 0.97 * ath and replies <= 2:
-        return "one-way tape (ATH≈spot, no chat)"
+    mayhem = str(coin.get("mayhem_state") or "").upper()
+    if mayhem and mayhem not in {"", "NONE", "NULL", "FALSE", "0", "OFF"}:
+        return f"mayhem painted book ({mayhem})"
     return ""
 
 
