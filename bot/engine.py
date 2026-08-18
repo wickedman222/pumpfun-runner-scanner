@@ -11,7 +11,6 @@ from .attention import (
     Attention,
     Story,
     extract_farm_reason,
-    has_character_identity,
     is_distinctive_name,
     is_generic_ticker,
     score_match,
@@ -145,21 +144,9 @@ async def evaluate_new(
             source="live",
             seen_at=time.time(),
         )
-    elif has_character_identity(coin):
-        # SHOBON / Gorikun / Jimothy class — character + site/live, not a newspaper.
-        path = "character"
-        match_score = 80
-        who = coin.get("name") or coin.get("symbol")
-        src = coin.get("website") or coin.get("twitter") or coin.get("url") or ""
-        story = Story(
-            title=f"Character first-mover: {who}",
-            url=src,
-            source="character",
-            seen_at=time.time(),
-        )
     else:
         v.failed_gate = "attention"
-        v.fail_reason = "no character / live crowd / first-mover story"
+        v.fail_reason = "no live crowd / first-mover story"
         return v
 
     structure = await inspect(http, coin)
@@ -198,25 +185,18 @@ async def confirm_expansion(http: httpx.AsyncClient, coin: dict, prev: dict) -> 
     if now_replies > prev_replies:
         expanding = True
         reasons.append(f"replies {prev_replies}→{now_replies}")
-    if now_usd >= prev_usd * 1.05:
+    if prev_usd > 0 and now_usd >= prev_usd * 1.15:
         expanding = True
         reasons.append(f"MC ${prev_usd:,.0f}→${now_usd:,.0f}")
     if fresh.get("complete") and not prev.get("complete"):
         expanding = True
         reasons.append("graduated during wait")
-    if fresh.get("is_currently_live"):
-        expanding = True
-        reasons.append("livestream still live")
     if prev.get("is_currently_live") and not fresh.get("is_currently_live") and not expanding:
         return False, "livestream died and book did not expand", fresh
 
     farm = extract_farm_reason(fresh)
     if farm:
         return False, farm, fresh
-
-    if not expanding and now_usd >= prev_usd and now_replies >= prev_replies and now_usd >= 8_000:
-        expanding = True
-        reasons.append("held bid after wait")
 
     if not expanding:
         return False, "attention did not expand after wait", fresh

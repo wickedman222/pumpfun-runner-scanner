@@ -84,6 +84,9 @@ def try_open(state: State, coin: dict, path: str = "") -> Fill | None:
     entry_mc = float(coin.get("usd_market_cap") or 0)
     if entry_mc <= 0:
         return None
+    if entry_mc > config.PAPER_MAX_ENTRY_MC:
+        log.info("Paper skip %s — late entry $%.0f", coin.get("symbol"), entry_mc)
+        return None
     qty = size * (1.0 - config.PAPER_FEE) * (1.0 - config.PAPER_ENTRY_SLIP)
     cash = snap["cash"] - size
     now = int(time.time())
@@ -227,7 +230,7 @@ def decide(pos: dict, coin: dict) -> list[tuple[float, str]]:
     if farm:
         return [(left, f"dead: flipped farm ({farm})")]
 
-    if entry and mc <= entry * config.PAPER_STOP_FRAC:
+    if (not tp1) and entry and mc <= entry * config.PAPER_STOP_FRAC:
         return [(left, f"dead: stop {multiple:.2f}x")]
 
     if (

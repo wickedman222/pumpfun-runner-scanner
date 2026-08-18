@@ -12,11 +12,12 @@ Repo: [github.com/wickedman222/pumpfun-runner-scanner](https://github.com/wicked
 
 ## What has to be true before a post
 
-Every gate must pass. A call comes from one of three **real** paths:
+Every gate must pass. A call comes from one of two **real** paths:
 
-1. **Tight news map** — the token *is* the headline (PNUT / Moo Deng). Shared words and crypto price articles do not count.
+1. **Tight news / wiki / reddit map** — the token *is* the story (PNUT / Moo Deng / Jimothy). A website plus a paragraph does not count.
 2. **Live crowd** — first mint, still live, real people in the room (SHOBON).
-3. **Character first-mover** — distinctive name + site/lore (Jimothy the Raccoon, Gorikun). BOOST is allowed here if the identity is real.
+
+BOOST is allowed only when that identity is real. Website-only “character” names are not calls.
 
 Never:
 
