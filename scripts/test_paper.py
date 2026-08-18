@@ -33,9 +33,6 @@ def main() -> None:
     st = State(os.path.join(tmp, "t.db"))
     st.ensure_paper_wallet(2.0)
 
-    late = try_open(st, coin("late1", 80_000, symbol="LATE"), path="live")
-    assert late is None
-
     assert abs(buy_size(2.0) - 0.15) < 1e-9, buy_size(2.0)
     assert buy_size(1.2) == 0.10
     assert buy_size(4.0) == 0.20

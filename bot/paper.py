@@ -84,9 +84,6 @@ def try_open(state: State, coin: dict, path: str = "") -> Fill | None:
     entry_mc = float(coin.get("usd_market_cap") or 0)
     if entry_mc <= 0:
         return None
-    if entry_mc > config.PAPER_MAX_ENTRY_MC:
-        log.info("Paper skip %s — late entry $%.0f", coin.get("symbol"), entry_mc)
-        return None
     qty = size * (1.0 - config.PAPER_FEE) * (1.0 - config.PAPER_ENTRY_SLIP)
     cash = snap["cash"] - size
     now = int(time.time())
