@@ -107,6 +107,59 @@ def is_generic_ticker(symbol: str, name: str) -> bool:
     return False
 
 
+COMMON_SUBJECTS = {
+    "hope", "room", "split", "scope", "vision", "virus", "brain", "golden",
+    "bull", "frog", "cat", "dog", "long", "short", "horse", "awake", "clout",
+    "abyss", "paper", "official", "newbie", "magic", "block", "time", "love",
+    "king", "queen", "moon", "star", "fire", "ice", "dark", "light", "money",
+    "power", "super", "mega", "ultra", "nova", "luna", "orion", "kepler",
+    "newton", "tesla", "casper", "todd", "alex", "max", "leo", "jack", "john",
+    "mike", "tom", "nick", "sam", "ben", "dan", "chris", "david", "james",
+    "alpha", "omega", "delta", "sigma", "gamma", "beta", "liquid", "water",
+    "earth", "wind", "stone", "rock", "gold", "silver", "iron", "steel",
+    "happy", "lucky", "crazy", "funny", "pretty", "little", "big", "black",
+    "white", "green", "red", "blue", "pink", "purple", "change", "changed",
+    "future", "past", "today", "project", "labs", "lab", "protocol", "network",
+    "chain", "swap", "finance", "capital", "trust", "fund", "reserve",
+    "penguin", "striper", "stripe", "anvil", "river", "ocean", "forest",
+    "tiger", "lion", "bear", "wolf", "fish", "bird", "mouse", "rat",
+}
+
+
+def is_common_subject(symbol: str, name: str) -> bool:
+    """Kepler / Hope / Room match Wikipedia. That is not a runner story."""
+    chunks = []
+    for part in (symbol, name):
+        raw = re.sub(r"[^a-z0-9]+", " ", (part or "").lower()).strip()
+        if raw:
+            chunks.append(raw.replace(" ", ""))
+            chunks.extend(raw.split())
+    return any(c in COMMON_SUBJECTS or c in WEAK_WORDS for c in chunks if c)
+
+
+def is_invented_token(text: str) -> bool:
+    t = re.sub(r"[^a-z0-9]", "", (text or "").lower())
+    if len(t) < 7 or t in COMMON_SUBJECTS or t in WEAK_WORDS:
+        return False
+    return True
+
+
+def culture_hit_ok(symbol: str, name: str, story: Story | None, score: int) -> bool:
+    """Only a real outside-crypto object: ESTRIPER / Jimothy / SHOBON — not Kepler."""
+    if score < 100 or story is None or is_common_subject(symbol, name):
+        return False
+    title = (story.title or "").lower()
+    name_l = (name or "").strip().lower()
+    sym = (symbol or "").lower().lstrip("$")
+    if name_l and len(name_l) >= 6 and name_l in title:
+        return True
+    if " " in name_l and name_l in title:
+        return True
+    if is_invented_token(sym) and sym in title:
+        return True
+    return False
+
+
 def is_distinctive_name(symbol: str, name: str) -> bool:
     """Jimothy / SHOBON / Gorikun — a real word or character, not USWS or $Z."""
     if is_generic_ticker(symbol, name) or is_fake_official(symbol, name):

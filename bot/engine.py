@@ -10,7 +10,9 @@ from . import config
 from .attention import (
     Attention,
     Story,
+    culture_hit_ok,
     extract_farm_reason,
+    is_common_subject,
     is_distinctive_name,
     is_generic_ticker,
     score_match,
@@ -118,7 +120,8 @@ async def evaluate_new(
 
     hits = attention.match_coin(coin["symbol"], coin["name"])
     distinctive = is_distinctive_name(coin.get("symbol") or "", coin.get("name") or "")
-    if not hits and distinctive and _allow_targeted_search():
+    common = is_common_subject(coin.get("symbol") or "", coin.get("name") or "")
+    if not hits and distinctive and not common and _allow_targeted_search():
         targeted = await attention.search_subject(http, search_query_for(coin))
         scored = []
         for item in targeted:
@@ -131,10 +134,14 @@ async def evaluate_new(
     story = None
     match_score = 0
     participants = int(coin.get("num_participants") or 0)
-    if hits and hits[0][1] >= config.MIN_MATCH_SCORE:
+    if hits and culture_hit_ok(coin.get("symbol") or "", coin.get("name") or "", hits[0][0], hits[0][1]):
         path = "news"
         story, match_score = hits[0]
-    elif live and participants >= config.MIN_LIVE_PARTICIPANTS:
+    elif (
+        live
+        and participants >= config.MIN_LIVE_PARTICIPANTS
+        and usd >= config.MIN_LIVE_MC
+    ):
         path = "live"
         match_score = 85
         title = coin.get("livestream_title") or coin.get("name") or coin.get("symbol")
@@ -146,7 +153,7 @@ async def evaluate_new(
         )
     else:
         v.failed_gate = "attention"
-        v.fail_reason = "no live crowd / first-mover story"
+        v.fail_reason = "no rare culture hit / real live crowd"
         return v
 
     structure = await inspect(http, coin)
@@ -185,7 +192,7 @@ async def confirm_expansion(http: httpx.AsyncClient, coin: dict, prev: dict) -> 
     if now_replies > prev_replies:
         expanding = True
         reasons.append(f"replies {prev_replies}→{now_replies}")
-    if prev_usd > 0 and now_usd >= prev_usd * 1.15:
+    if prev_usd > 0 and now_usd >= prev_usd * 1.20:
         expanding = True
         reasons.append(f"MC ${prev_usd:,.0f}→${now_usd:,.0f}")
     if fresh.get("complete") and not prev.get("complete"):

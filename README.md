@@ -12,10 +12,10 @@ Repo: [github.com/wickedman222/pumpfun-runner-scanner](https://github.com/wicked
 
 ## What has to be true before a post
 
-Every gate must pass. A call comes from one of two **real** paths:
+Every gate must pass. Real runners are rare — **at most 3 calls/day**.
 
-1. **Tight news / wiki / reddit map** — the token *is* the story (PNUT / Moo Deng / Jimothy). A website plus a paragraph does not count.
-2. **Live crowd** — first mint, still live, real people in the room (SHOBON).
+1. **Rare culture hit** — invented / unique name that *is* the outside story (ESTRIPER, Jimothy, SHOBON). Kepler / Hope / Room matching Wikipedia does not count.
+2. **Real live crowd** — 15+ in the room and the book already has some meat ($8k+). Five people on a $2k stream does not count.
 
 BOOST is allowed only when that identity is real. Website-only “character” names are not calls.
 

@@ -240,7 +240,7 @@ def mark_sol(pos: dict) -> float:
 async def boot_message(http: httpx.AsyncClient) -> None:
     text = (
         "<b>Pump.fun runner scanner online</b>\n"
-        "Calls: live crowd, or a tight news/wiki map. Website-only names are not buys.\n"
+        "Calls: rare culture hit or a real live crowd. Few names. 3/day max.\n"
         "USWS-class painted books stay banned. Not every BOOST coin.\n"
         f"Leaderboard every {config.LEADERBOARD_SEC // 3600}h · paper balance every {config.PAPER_REPORT_SEC // 3600}h"
     )

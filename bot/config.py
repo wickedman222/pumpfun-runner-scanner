@@ -83,9 +83,11 @@ MAX_TOKEN_AGE_SEC = _int("MAX_TOKEN_AGE_SEC", 20 * 60)
 MAX_LIVE_AGE_SEC = _int("MAX_LIVE_AGE_SEC", 6 * 3600)
 # Organic homepage books (boost=NONE) often print 1–6h after launch, not in 20m.
 MAX_ACTIVE_AGE_SEC = _int("MAX_ACTIVE_AGE_SEC", 6 * 3600)
-MIN_LIVE_PARTICIPANTS = _int("MIN_LIVE_PARTICIPANTS", 5)
-# 0 = no daily cap. Strictness comes from the gates, not a quota.
-MAX_SIGNALS_PER_DAY = _int("MAX_SIGNALS_PER_DAY", 0)
+MIN_LIVE_PARTICIPANTS = _int("MIN_LIVE_PARTICIPANTS", 15)
+MIN_LIVE_MC = _float("MIN_LIVE_MC", 8_000)
+# Real runners are rare. 3 calls/day is already a lot.
+MAX_SIGNALS_PER_DAY = _int("MAX_SIGNALS_PER_DAY", 3)
+MIN_MATCH_SCORE = _int("MIN_MATCH_SCORE", 100)
 LEADERBOARD_SEC = _int("LEADERBOARD_SEC", 6 * 3600)
 LEADERBOARD_SIZE = _int("LEADERBOARD_SIZE", 15)
 
@@ -96,7 +98,6 @@ MAX_TOP10_PCT = _float("MAX_TOP10_PCT", 40.0)
 MAX_INSIDER_PCT = _float("MAX_INSIDER_PCT", 20.0)
 MAX_RUGCHECK_SCORE = _int("MAX_RUGCHECK_SCORE", 1500)
 MIN_UNIQUE_HOLDERS = _int("MIN_UNIQUE_HOLDERS", 25)
-MIN_MATCH_SCORE = _int("MIN_MATCH_SCORE", 90)
 # Hard chase-line only. Graduation is ~$69k — an $80k cap cuts off the
 # "just graduated and still running" names that actually build a 2 SOL book.
 # Above ~$200k a 4x is already a $800k+ coin; that is a different trade.
@@ -114,7 +115,7 @@ PAPER_BOOK_ID = _env("PAPER_BOOK_ID", "overnight-1")
 PAPER_SIZE_FRAC = _float("PAPER_SIZE_FRAC", 0.075)  # 2 SOL → 0.15
 PAPER_SIZE_MIN = _float("PAPER_SIZE_MIN", 0.10)
 PAPER_SIZE_MAX = _float("PAPER_SIZE_MAX", 0.20)
-PAPER_MAX_OPEN = _int("PAPER_MAX_OPEN", 3)
+PAPER_MAX_OPEN = _int("PAPER_MAX_OPEN", 2)
 PAPER_MIN_EQUITY = _float("PAPER_MIN_EQUITY", 0.25)
 PAPER_FEE = _float("PAPER_FEE", 0.01)
 PAPER_ENTRY_SLIP = _float("PAPER_ENTRY_SLIP", 0.08)
