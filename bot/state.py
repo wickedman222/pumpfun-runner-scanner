@@ -36,6 +36,46 @@ CREATE TABLE IF NOT EXISTS pending (
 );
 CREATE INDEX IF NOT EXISTS idx_seen_created ON seen_mints(created_ts);
 CREATE INDEX IF NOT EXISTS idx_seen_symbol ON seen_mints(symbol);
+CREATE TABLE IF NOT EXISTS paper_wallet (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    cash_sol REAL NOT NULL,
+    starting_sol REAL NOT NULL,
+    updated_at INTEGER
+);
+CREATE TABLE IF NOT EXISTS paper_positions (
+    mint TEXT PRIMARY KEY,
+    symbol TEXT,
+    name TEXT,
+    url TEXT,
+    path TEXT,
+    opened_at INTEGER,
+    cost_sol REAL,
+    original_qty_sol REAL,
+    remaining_qty_sol REAL,
+    remaining_frac REAL,
+    entry_mc REAL,
+    ath_mc REAL,
+    last_mc REAL,
+    realized_sol REAL,
+    tp1_hit INTEGER DEFAULT 0,
+    tp2_hit INTEGER DEFAULT 0,
+    tp3_hit INTEGER DEFAULT 0,
+    status TEXT,
+    close_reason TEXT,
+    closed_at INTEGER
+);
+CREATE TABLE IF NOT EXISTS paper_fills (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mint TEXT,
+    ts INTEGER,
+    side TEXT,
+    reason TEXT,
+    frac REAL,
+    multiple REAL,
+    sol REAL,
+    cash_after REAL,
+    mc REAL
+);
 """
 
 
@@ -189,3 +229,93 @@ class State:
                 (day_ago,),
             ).fetchone()
         return int(row["n"] if row else 0)
+
+    def ensure_paper_wallet(self, starting: float) -> dict:
+        with self._conn() as con:
+            row = con.execute("SELECT * FROM paper_wallet WHERE id = 1").fetchone()
+            if not row:
+                now = int(time.time())
+                con.execute(
+                    "INSERT INTO paper_wallet(id, cash_sol, starting_sol, updated_at) VALUES (1,?,?,?)",
+                    (starting, starting, now),
+                )
+                return {"cash_sol": starting, "starting_sol": starting, "updated_at": now}
+        return dict(row)
+
+    def paper_wallet(self) -> dict:
+        with self._conn() as con:
+            row = con.execute("SELECT * FROM paper_wallet WHERE id = 1").fetchone()
+        return dict(row) if row else {"cash_sol": 0.0, "starting_sol": 0.0, "updated_at": 0}
+
+    def set_paper_cash(self, cash: float) -> None:
+        with self._conn() as con:
+            con.execute(
+                "UPDATE paper_wallet SET cash_sol = ?, updated_at = ? WHERE id = 1",
+                (cash, int(time.time())),
+            )
+
+    def paper_position(self, mint: str) -> dict | None:
+        with self._conn() as con:
+            row = con.execute("SELECT * FROM paper_positions WHERE mint = ?", (mint,)).fetchone()
+        return dict(row) if row else None
+
+    def open_paper_positions(self) -> list[dict]:
+        with self._conn() as con:
+            rows = con.execute(
+                "SELECT * FROM paper_positions WHERE status IN ('open','moonbag') ORDER BY opened_at ASC"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def all_paper_positions(self) -> list[dict]:
+        with self._conn() as con:
+            rows = con.execute(
+                "SELECT * FROM paper_positions ORDER BY opened_at ASC"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def upsert_paper_position(self, pos: dict) -> None:
+        cols = (
+            "mint", "symbol", "name", "url", "path", "opened_at", "cost_sol",
+            "original_qty_sol", "remaining_qty_sol", "remaining_frac",
+            "entry_mc", "ath_mc", "last_mc", "realized_sol",
+            "tp1_hit", "tp2_hit", "tp3_hit", "status", "close_reason", "closed_at",
+        )
+        vals = [pos.get(c) for c in cols]
+        placeholders = ",".join("?" * len(cols))
+        assignments = ",".join(f"{c}=excluded.{c}" for c in cols if c != "mint")
+        with self._conn() as con:
+            con.execute(
+                f"""
+                INSERT INTO paper_positions({",".join(cols)}) VALUES ({placeholders})
+                ON CONFLICT(mint) DO UPDATE SET {assignments}
+                """,
+                vals,
+            )
+
+    def add_paper_fill(self, fill: dict) -> None:
+        with self._conn() as con:
+            con.execute(
+                """
+                INSERT INTO paper_fills(mint, ts, side, reason, frac, multiple, sol, cash_after, mc)
+                VALUES (?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    fill.get("mint"),
+                    int(fill.get("ts") or time.time()),
+                    fill.get("side"),
+                    fill.get("reason"),
+                    fill.get("frac"),
+                    fill.get("multiple"),
+                    fill.get("sol"),
+                    fill.get("cash_after"),
+                    fill.get("mc"),
+                ),
+            )
+
+    def paper_fills(self, limit: int = 40) -> list[dict]:
+        with self._conn() as con:
+            rows = con.execute(
+                "SELECT * FROM paper_fills ORDER BY ts DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        return [dict(r) for r in rows]

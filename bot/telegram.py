@@ -155,6 +155,88 @@ def format_leaderboard(rows: list[dict], scanned: int, headlines: int) -> str:
     return "\n".join(lines)
 
 
+def _fmt_sol(value: float) -> str:
+    sign = "+" if value > 0 else ""
+    return f"{sign}{value:.3f} SOL"
+
+
+def format_paper_fill(fill, snap: dict) -> str:
+    pos = fill.pos
+    url = pos.get("url") or ""
+    name = f"${_esc(fill.symbol)}"
+    if url:
+        name = f"<a href=\"{_esc(url)}\">${_esc(fill.symbol)}</a>"
+    pnl = snap["equity"] - snap["start"]
+    if fill.side == "buy":
+        lines = [
+            "<b>PAPER BUY</b>  (not real SOL)",
+            "",
+            f"{name}  {_esc(pos.get('name') or '')}",
+            f"size <b>{abs(fill.sol):.3f} SOL</b> · entry MC ${_esc(f'{fill.mc:,.0f}')}",
+            f"path {_esc(pos.get('path') or '—')}",
+            "",
+            "<b>PLAN</b>",
+            f"stop −{int((1 - config.PAPER_STOP_FRAC) * 100)}% · flatten if dead {config.PAPER_TIME_DEAD_SEC // 60}m",
+            f"sell {int(config.PAPER_TP1_SELL * 100)}% at {config.PAPER_TP1_MULT:.1f}x",
+            f"sell {int(config.PAPER_TP2_SELL * 100)}% at {config.PAPER_TP2_MULT:.1f}x",
+            f"moonbag {int((1 - config.PAPER_TP1_SELL - config.PAPER_TP2_SELL) * 100)}% · clip half at {config.PAPER_TP3_MULT:.0f}x · trail −{int(config.PAPER_TRAIL_GIVEBACK * 100)}% off ATH",
+        ]
+    else:
+        left = float(pos.get("remaining_frac") or 0)
+        status = pos.get("status") or "open"
+        lines = [
+            "<b>PAPER SELL</b>  (not real SOL)",
+            "",
+            f"{name}  {_esc(fill.reason)}",
+            f"{int(fill.frac * 100)}% of original @ <b>{fill.multiple:.2f}x</b> · {_esc(_fmt_sol(fill.sol))}",
+            f"left {left * 100:.0f}% · {status}",
+        ]
+    lines += [
+        "",
+        f"wallet  cash {snap['cash']:.3f}  open {snap['unreal']:.3f}  equity <b>{snap['equity']:.3f} SOL</b>",
+        f"vs start {snap['start']:.2f}  {_esc(_fmt_sol(pnl))}",
+        f"{len(snap['open'])} open · next size {snap['size']:.3f} SOL",
+    ]
+    return "\n".join(lines)
+
+
+def format_paper_book(snap: dict) -> str:
+    pnl = snap["equity"] - snap["start"]
+    lines = [
+        "<b>PAPER BOOK</b>  (not real SOL)",
+        f"equity <b>{snap['equity']:.3f} SOL</b>  {_esc(_fmt_sol(pnl))} from {snap['start']:.2f}",
+        f"cash {snap['cash']:.3f} · in positions {snap['unreal']:.3f}",
+        f"next buy {snap['size']:.3f} SOL · max {config.PAPER_MAX_OPEN} open",
+        "",
+    ]
+    if not snap["open"]:
+        lines.append("No open paper positions.")
+    else:
+        for p in snap["open"]:
+            entry = float(p.get("entry_mc") or 0)
+            last = float(p.get("last_mc") or 0)
+            mult = (last / entry) if entry else 0
+            url = p.get("url") or ""
+            tag = f"${_esc(p.get('symbol') or '?')}"
+            if url:
+                tag = f"<a href=\"{_esc(url)}\">{tag}</a>"
+            lines.append(
+                f"• {tag}  {mult:.2f}x  left {float(p.get('remaining_frac') or 0)*100:.0f}%  "
+                f"{_esc(p.get('status') or '')}  mark {mark_sol(p):.3f}"
+            )
+    lines.append(f"\n<i>{snap['closed_n']} closed paper trades</i>")
+    return "\n".join(lines)
+
+
+def mark_sol(pos: dict) -> float:
+    entry = float(pos.get("entry_mc") or 0)
+    last = float(pos.get("last_mc") or 0)
+    qty = float(pos.get("remaining_qty_sol") or 0)
+    if entry <= 0:
+        return 0.0
+    return qty * (last / entry)
+
+
 async def boot_message(http: httpx.AsyncClient) -> None:
     text = (
         "<b>Pump.fun runner scanner online</b>\n"
@@ -162,6 +244,13 @@ async def boot_message(http: httpx.AsyncClient) -> None:
         "USWS-class painted books stay banned. Not every BOOST coin.\n"
         f"Leaderboard every {config.LEADERBOARD_SEC // 3600}h"
     )
+    if config.PAPER_ENABLED:
+        text += (
+            f"\n\n<b>Paper book {config.PAPER_START_SOL:.2f} SOL</b> — no real fills.\n"
+            f"Size {config.PAPER_SIZE_FRAC * 100:.1f}% of equity "
+            f"({config.PAPER_SIZE_MIN:.2f}–{config.PAPER_SIZE_MAX:.2f}), "
+            f"max {config.PAPER_MAX_OPEN} open."
+        )
     ok = await send(http, text)
     if ok:
         log.info("Boot message sent to %s", config.TELEGRAM_CHAT_ID)

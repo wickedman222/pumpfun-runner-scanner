@@ -6,13 +6,20 @@ import sys
 import time
 from dataclasses import dataclass
 
-from . import config, health
+from . import config, health, paper
 from .attention import Attention
 from .engine import Verdict, confirm_expansion, evaluate_new
 from .httputil import client
 from .pump import active_coins, age_seconds, fetch_coin, latest_coins, live_coins
 from .state import State
-from .telegram import boot_message, format_leaderboard, format_signal, send
+from .telegram import (
+    boot_message,
+    format_leaderboard,
+    format_paper_book,
+    format_paper_fill,
+    format_signal,
+    send,
+)
 
 # Railway paints stderr red. Keep INFO on stdout so the dashboard stays white.
 logging.basicConfig(
@@ -38,6 +45,9 @@ class Pending:
 async def run() -> None:
     config.require_telegram()
     state = State()
+    if config.PAPER_ENABLED:
+        state.ensure_paper_wallet(config.PAPER_START_SOL)
+        health.STATUS["paper_equity"] = round(paper.snapshot(state)["equity"], 4)
     attention = Attention()
     pending: dict[str, Pending] = {}
     last_attention = 0.0
@@ -121,6 +131,7 @@ async def run() -> None:
                         story=item.coin.get("_story"),
                         match_score=item.match_score,
                         structure=item.coin.get("_structure"),
+                        path=item.coin.get("_path") or "",
                     )
                     text = format_signal(v, why)
                     sent = await send(http, text, preview=True)
@@ -131,8 +142,17 @@ async def run() -> None:
                         state.mark_posted(fresh, story_title)
                         health.STATUS["posted"] = len(state.list_posted())
                         log.info("POSTED %s — %s", fresh.get("symbol"), why)
+                        if config.PAPER_ENABLED:
+                            fill = paper.try_open(state, fresh, item.coin.get("_path") or "")
+                            if fill:
+                                snap = paper.snapshot(state)
+                                health.STATUS["paper_equity"] = round(snap["equity"], 4)
+                                await send(http, format_paper_fill(fill, snap), preview=True)
                     else:
                         log.error("Failed to post %s", fresh.get("symbol"))
+
+                if config.PAPER_ENABLED:
+                    await _manage_paper(http, state)
 
                 if time.time() - last_leaderboard >= config.LEADERBOARD_SEC:
                     await _send_leaderboard(http, state, attention, health.STATUS.get("seen", 0))
@@ -161,6 +181,7 @@ def _queue_watch(pending: dict[str, Pending], coin: dict, verdict: Verdict) -> N
     coin["_story"] = story
     coin["_match"] = verdict.match_score
     coin["_structure"] = verdict.structure
+    coin["_path"] = verdict.path
     log.info(
         "Watching %s ($%s) path=%s match=%s — %s",
         coin.get("symbol"),
@@ -191,6 +212,30 @@ async def _send_leaderboard(http, state: State, attention, scanned: int) -> None
         log.info("Leaderboard sent (%s tracked)", len(rows))
     else:
         log.error("Leaderboard send failed")
+    if config.PAPER_ENABLED:
+        snap = paper.snapshot(state)
+        health.STATUS["paper_equity"] = round(snap["equity"], 4)
+        book = format_paper_book(snap)
+        sent_book = await send(http, book)
+        if sent_book:
+            log.info("Paper book sent (equity %.3f)", snap["equity"])
+
+
+async def _manage_paper(http, state: State) -> None:
+    for pos in state.open_paper_positions():
+        mint = pos.get("mint")
+        if not mint:
+            continue
+        coin = await fetch_coin(http, mint)
+        if not coin:
+            continue
+        fills = paper.on_tick(state, pos, coin)
+        if not fills:
+            continue
+        snap = paper.snapshot(state)
+        health.STATUS["paper_equity"] = round(snap["equity"], 4)
+        for fill in fills:
+            await send(http, format_paper_fill(fill, snap), preview=True)
 
 
 def main() -> None:

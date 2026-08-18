@@ -4,7 +4,7 @@ Posts **only high-conviction Pump.fun candidates** to Telegram.
 
 It does **not** snipe the board. It starts from exogenous attention (news / reddit), then takes the first clean mint that maps to that story. Most days it posts nothing. That is the design.
 
-No auto-trading.
+No real-SOL trading. After a call it opens a **paper** position (starts at 2 SOL) and manages scale-outs / dead exits in Telegram.
 
 Repo: [github.com/wickedman222/pumpfun-runner-scanner](https://github.com/wickedman222/pumpfun-runner-scanner)
 
@@ -61,7 +61,23 @@ Attention-first. I only post if it looks like a real runner.
 No daily cap — gates decide.
 ```
 
-Every 6 hours it also posts an **all-time top 15** of calls ranked by ATH multiple (the x from the price when we posted).
+Every 6 hours it also posts an **all-time top 15** of calls ranked by ATH multiple (the x from the price when we posted), plus the paper book.
+
+## Paper book
+
+Starts at **2 SOL** (not real). A call buys **7.5% of equity** (0.15 SOL at the start, floored at 0.10, capped at 0.20). Max **4** open names. Fills assume 1% fee, 8% entry slip, 5% exit slip.
+
+| Level | Action |
+|---|---|
+| −45% from entry | Flatten — dead |
+| 2 hours and never 1.6x | Flatten — no go |
+| Live path, stream dies, still &lt; 1.2x | Flatten |
+| **2x** | Sell 40% |
+| **4x** | Sell 30% (30% moonbag left) |
+| **10x** | Sell half the moonbag |
+| After 2x, −50% off post-entry ATH | Trail the rest |
+
+Size grows if the book grows, shrinks if it draws down. Set `PAPER_ENABLED=0` to turn it off. `PAPER_START_SOL` only applies on first boot of an empty wallet.
 
 If that message does not arrive: token is wrong, bot is not in the channel, or chat id is wrong.
 

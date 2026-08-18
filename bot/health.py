@@ -14,6 +14,7 @@ STATUS = {
     "posted": 0,
     "attention": 0,
     "last_error": "",
+    "paper_equity": 0,
 }
 
 

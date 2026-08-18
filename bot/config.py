@@ -102,6 +102,28 @@ MAX_FIRST_LOOK_MC = _float("MAX_FIRST_LOOK_MC", 80_000)
 # Copy farms (USWS/EYE style) — skip the whole ticker family, do not promote the original.
 META_COPY_MIN = _int("META_COPY_MIN", 2)
 
+# --- Paper book (no real SOL) ---
+PAPER_ENABLED = _int("PAPER_ENABLED", 1) == 1
+PAPER_START_SOL = _float("PAPER_START_SOL", 2.0)
+PAPER_SIZE_FRAC = _float("PAPER_SIZE_FRAC", 0.075)  # 2 SOL → 0.15
+PAPER_SIZE_MIN = _float("PAPER_SIZE_MIN", 0.10)
+PAPER_SIZE_MAX = _float("PAPER_SIZE_MAX", 0.20)
+PAPER_MAX_OPEN = _int("PAPER_MAX_OPEN", 4)
+PAPER_MIN_EQUITY = _float("PAPER_MIN_EQUITY", 0.25)
+PAPER_FEE = _float("PAPER_FEE", 0.01)
+PAPER_ENTRY_SLIP = _float("PAPER_ENTRY_SLIP", 0.08)
+PAPER_EXIT_SLIP = _float("PAPER_EXIT_SLIP", 0.05)
+PAPER_STOP_FRAC = _float("PAPER_STOP_FRAC", 0.55)  # flatten at −45%
+PAPER_TIME_DEAD_SEC = _int("PAPER_TIME_DEAD_SEC", 2 * 3600)
+PAPER_TIME_DEAD_MULT = _float("PAPER_TIME_DEAD_MULT", 1.6)
+PAPER_TP1_MULT = _float("PAPER_TP1_MULT", 2.0)
+PAPER_TP1_SELL = _float("PAPER_TP1_SELL", 0.40)
+PAPER_TP2_MULT = _float("PAPER_TP2_MULT", 4.0)
+PAPER_TP2_SELL = _float("PAPER_TP2_SELL", 0.30)  # of original; leaves ~30% moonbag
+PAPER_TP3_MULT = _float("PAPER_TP3_MULT", 10.0)
+PAPER_TP3_SELL = _float("PAPER_TP3_SELL", 0.15)  # half the moonbag
+PAPER_TRAIL_GIVEBACK = _float("PAPER_TRAIL_GIVEBACK", 0.50)  # sell rest if −50% off post-entry ATH after TP1
+
 # Known AMM / pool authorities — not "holders"
 LP_OWNERS = {
     "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1",  # Raydium
