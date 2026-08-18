@@ -11,8 +11,11 @@ from .attention import (
     Attention,
     Story,
     extract_farm_reason,
+    has_character_identity,
+    is_distinctive_name,
     is_generic_ticker,
     score_match,
+    search_query_for,
 )
 from .pump import age_seconds, fetch_coin
 from .state import State
@@ -115,12 +118,9 @@ async def evaluate_new(
         return v
 
     hits = attention.match_coin(coin["symbol"], coin["name"])
-    name = coin.get("name") or ""
-    distinctive = (" " in name.strip() and len(name) >= 6) or len(name) >= 8
+    distinctive = is_distinctive_name(coin.get("symbol") or "", coin.get("name") or "")
     if not hits and distinctive and _allow_targeted_search():
-        targeted = await attention.search_subject(
-            http, f'"{name}"' if " " in name else name
-        )
+        targeted = await attention.search_subject(http, search_query_for(coin))
         scored = []
         for item in targeted:
             s = score_match(coin["symbol"], coin["name"], item)
@@ -131,24 +131,35 @@ async def evaluate_new(
     path = ""
     story = None
     match_score = 0
+    participants = int(coin.get("num_participants") or 0)
     if hits and hits[0][1] >= config.MIN_MATCH_SCORE:
         path = "news"
         story, match_score = hits[0]
-    elif live:
-        # 2025–26 real runners often started as a live stream, not a newspaper.
-        # Still banned if BOOST/Mayhem/fake-official already fired above.
+    elif live and participants >= config.MIN_LIVE_PARTICIPANTS:
         path = "live"
         match_score = 85
         title = coin.get("livestream_title") or coin.get("name") or coin.get("symbol")
         story = Story(
-            title=f"Livestream live: {title}",
+            title=f"Livestream ({participants} in room): {title}",
             url=coin.get("url") or "",
             source="live",
             seen_at=time.time(),
         )
+    elif has_character_identity(coin):
+        # SHOBON / Gorikun / Jimothy class — character + site/live, not a newspaper.
+        path = "character"
+        match_score = 80
+        who = coin.get("name") or coin.get("symbol")
+        src = coin.get("website") or coin.get("twitter") or coin.get("url") or ""
+        story = Story(
+            title=f"Character first-mover: {who}",
+            url=src,
+            source="character",
+            seen_at=time.time(),
+        )
     else:
         v.failed_gate = "attention"
-        v.fail_reason = "no exogenous first-mover story"
+        v.fail_reason = "no character / live crowd / first-mover story"
         return v
 
     structure = await inspect(http, coin)

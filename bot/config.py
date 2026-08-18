@@ -83,6 +83,7 @@ MAX_TOKEN_AGE_SEC = _int("MAX_TOKEN_AGE_SEC", 20 * 60)
 MAX_LIVE_AGE_SEC = _int("MAX_LIVE_AGE_SEC", 6 * 3600)
 # Organic homepage books (boost=NONE) often print 1–6h after launch, not in 20m.
 MAX_ACTIVE_AGE_SEC = _int("MAX_ACTIVE_AGE_SEC", 6 * 3600)
+MIN_LIVE_PARTICIPANTS = _int("MIN_LIVE_PARTICIPANTS", 5)
 # 0 = no daily cap. Strictness comes from the gates, not a quota.
 MAX_SIGNALS_PER_DAY = _int("MAX_SIGNALS_PER_DAY", 0)
 LEADERBOARD_SEC = _int("LEADERBOARD_SEC", 6 * 3600)

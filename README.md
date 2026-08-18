@@ -12,20 +12,22 @@ Repo: [github.com/wickedman222/pumpfun-runner-scanner](https://github.com/wicked
 
 ## What has to be true before a post
 
-Every gate must pass. A call comes from one of two **real** paths:
+Every gate must pass. A call comes from one of three **real** paths:
 
 1. **Tight news map** — the token *is* the headline (PNUT / Moo Deng). Shared words and crypto price articles do not count.
-2. **Clean livestream** — first mint, still live, BOOST **off**. This is how a lot of 2025–26 organic runners actually started.
+2. **Live crowd** — first mint, still live, real people in the room (SHOBON).
+3. **Character first-mover** — distinctive name + site/lore (Jimothy the Raccoon, Gorikun). BOOST is allowed here if the identity is real.
 
 Never:
 
-- BOOST / Mayhem painted books (USWS, EYE, UOTF, WWR, Z500…)
-- Fake US fund/reserve names
+- Fake US fund/reserve names (USWS, EYE, UOTF, WWR, Z500…)
+- BOOST with **no** character, site, or live crowd (painted one-way tape)
+- Mayhem
 - Copy-ticker farms
 - First look already above ~$80k
 - Serial-rug / bundled structure
 
-2026 homepage runners (ANSEM, CHONKETHA, JIMOTHY, TBB, KET) are `boost_mode=NONE` and often have **0 on-site replies**. Empty chat is not a farm signal anymore. The $100M honeypot tapes are `boost_mode=COMPLETED`.
+Empty on-site chat is normal in 2026. The scam tell is the USWS chart (ATH glued to spot, acronym, no identity), not BOOST by itself.
 
 Generic tickers (`PEPE`, `CAT`, `MOON`, …) are ignored on purpose.
 

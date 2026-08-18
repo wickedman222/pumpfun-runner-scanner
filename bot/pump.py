@@ -38,6 +38,7 @@ def normalize_coin(raw: dict) -> dict:
         "reply_count": int(raw.get("reply_count") or 0),
         "is_currently_live": bool(raw.get("is_currently_live")),
         "livestream_title": (raw.get("livestream_title") or "").strip(),
+        "num_participants": int(raw.get("num_participants") or 0),
         "twitter": raw.get("twitter") or "",
         "telegram": raw.get("telegram") or "",
         "website": raw.get("website") or "",

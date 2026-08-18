@@ -64,7 +64,8 @@ def format_signal(v: Verdict, expansion: str) -> str:
         "<b>WHY THIS TOKEN</b>",
         "first mint that maps to the story in our window",
         f"curve {coin.get('curve_pct')}% · MC ${_esc(f'{usd:,.0f}')} · ATH ${_esc(f'{ath:,.0f}')}",
-        f"replies {coin.get('reply_count')} · live {bool(coin.get('is_currently_live'))}",
+        f"path {v.path or '—'} · replies {coin.get('reply_count')} · live {bool(coin.get('is_currently_live'))}"
+        + (f" ({coin.get('num_participants')} in room)" if coin.get("num_participants") else ""),
         "",
         "<b>STRUCTURE</b>",
     ]
@@ -157,8 +158,8 @@ def format_leaderboard(rows: list[dict], scanned: int, headlines: int) -> str:
 async def boot_message(http: httpx.AsyncClient) -> None:
     text = (
         "<b>Pump.fun runner scanner online</b>\n"
-        "Calls: tight real-world story, or a clean live stream.\n"
-        "BOOST / Mayhem / fake-fund books are never called.\n"
+        "Calls: character/culture first-mover, live crowd, or a tight news map.\n"
+        "USWS-class painted books stay banned. Not every BOOST coin.\n"
         f"Leaderboard every {config.LEADERBOARD_SEC // 3600}h"
     )
     ok = await send(http, text)

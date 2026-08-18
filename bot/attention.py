@@ -100,9 +100,54 @@ def is_generic_ticker(symbol: str, name: str) -> bool:
     if sym in GENERIC_TICKERS:
         return True
     name_l = (name or "").strip().lower()
-    if name_l in {"cat", "dog", "pepe", "moon", "coin", "token"}:
+    if name_l in {"cat", "dog", "pepe", "moon", "coin", "token", "the z coin", "z coin"}:
         return True
     if name_l in WEAK_WORDS:
+        return True
+    return False
+
+
+def is_distinctive_name(symbol: str, name: str) -> bool:
+    """Jimothy / SHOBON / Gorikun — a real word or character, not USWS or $Z."""
+    if is_generic_ticker(symbol, name) or is_fake_official(symbol, name):
+        return False
+    n = (name or "").strip()
+    s = (symbol or "").strip().lstrip("$")
+    if len(n) >= 6:
+        return True
+    if len(s) >= 5 and re.search(r"[AEIOUaeiou]", s):
+        return True
+    return False
+
+
+def search_query_for(coin: dict) -> str:
+    name = (coin.get("name") or "").strip()
+    symbol = (coin.get("symbol") or "").strip()
+    words = extract_words(name)
+    if words and not name.startswith("("):
+        return name
+    return symbol or name
+
+
+def has_character_identity(coin: dict) -> bool:
+    """Real recent runners: a character/culture, live crowd, or both.
+
+    SHOBON = live + 49 people + shobon.xyz
+    Gorikun = distinctive name + site + lore
+    Jimothy = raccoon + IG/YT
+    USWS/EYE = BOOST, no identity, ATH glued to spot
+    """
+    if not is_distinctive_name(coin.get("symbol") or "", coin.get("name") or ""):
+        return False
+    parts = int(coin.get("num_participants") or 0)
+    if coin.get("is_currently_live") and parts >= 5:
+        return True
+    twitter = bool(coin.get("twitter"))
+    website = bool(coin.get("website"))
+    lore = len(coin.get("description") or "") >= 60
+    if website and (twitter or lore):
+        return True
+    if twitter and lore:
         return True
     return False
 
@@ -136,20 +181,23 @@ def _boost_on(coin: dict) -> bool:
 
 
 def extract_farm_reason(coin: dict) -> str:
-    """Painted book / fake-official. Pump contracts look clean; these still are not calls.
+    """Skip painted extract books. Do not skip every BOOST coin.
 
-    USWS/EYE/UOTF class = boost_mode=COMPLETED (or Mayhem). That is the honeypot tape.
-    2026 homepage runners (ANSEM, CHONKETHA, JIMOTHY, TBB, KET) are boost_mode=NONE
-    and often have 0 on-site replies — chat moved to X / live / TG. Do not treat
-    empty comments or cashback-alone as a farm.
+    USWS/EYE: BOOST, fake-official name, no site, ATH glued to spot.
+    SHOBON/Gorikun: BOOST too, but a real character + site / live crowd.
+    Mayhem stays banned. Empty chat is not a signal either way.
     """
     if is_fake_official(coin.get("symbol") or "", coin.get("name") or ""):
         return "fake official / fund-reserve meta"
-    if _boost_on(coin):
-        return f"boost/mayhem painted book ({coin.get('boost_mode')})"
     mayhem = str(coin.get("mayhem_state") or "").upper()
     if mayhem and mayhem not in {"", "NONE", "NULL", "FALSE", "0", "OFF"}:
         return f"mayhem painted book ({mayhem})"
+    if _boost_on(coin) and not has_character_identity(coin):
+        usd = float(coin.get("usd_market_cap") or 0)
+        ath = float(coin.get("ath_market_cap") or usd or 0)
+        if ath > 0 and usd >= 0.95 * ath and usd >= 20_000:
+            return "boost one-way tape (no character/live identity)"
+        return "boost book with no character/live identity"
     return ""
 
 
@@ -210,12 +258,39 @@ class Attention:
         return len(self.stories)
 
     async def search_subject(self, http: httpx.AsyncClient, query: str) -> list[Story]:
-        q = re.sub(r"\s+", "+", (query or "").strip())
+        q = (query or "").strip()
         if len(q) < 3:
             return []
-        url = f"https://news.google.com/rss/search?q={q}&hl=en-US&gl=US&ceid=US:en"
-        xml = await get_text(http, url)
-        return [s for s in parse_rss(xml, "news-search") if not is_token_promo(s.title)]
+        found: list[Story] = []
+        q_plus = re.sub(r"\s+", "+", q)
+        xml = await get_text(
+            http, f"https://news.google.com/rss/search?q={q_plus}&hl=en-US&gl=US&ceid=US:en"
+        )
+        found.extend(parse_rss(xml, "news-search"))
+
+        wiki = await get_json(
+            http,
+            "https://en.wikipedia.org/w/api.php"
+            f"?action=opensearch&search={q_plus}&limit=5&namespace=0&format=json",
+        )
+        if isinstance(wiki, list) and len(wiki) >= 4:
+            titles, descs, links = wiki[1], wiki[2], wiki[3]
+            now = time.time()
+            for title, desc, link in zip(titles, descs, links):
+                blob = f"{title} {desc}"
+                if not title or is_token_promo(blob):
+                    continue
+                found.append(Story(title=f"{title} — {desc}" if desc else title, url=link or "", source="wiki", seen_at=now))
+
+        reddit = await get_json(
+            http,
+            f"https://www.reddit.com/search.json?q={q_plus}&limit=8&sort=relevance",
+            headers={"User-Agent": "pumpfun-runner-scanner/1.0"},
+        )
+        if isinstance(reddit, dict):
+            found.extend(parse_reddit(reddit, "reddit-search"))
+
+        return [s for s in found if s.title and not is_token_promo(s.title)]
 
     def match_coin(self, symbol: str, name: str) -> list[tuple[Story, int]]:
         hits: list[tuple[Story, int]] = []
