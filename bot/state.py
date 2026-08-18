@@ -93,6 +93,20 @@ class State:
             except sqlite3.IntegrityError:
                 return False
 
+    def same_symbol_copies(self, symbol: str, created_ts: int) -> int:
+        symbol = (symbol or "").upper()
+        if not symbol:
+            return 0
+        with self._conn() as con:
+            row = con.execute(
+                """
+                SELECT COUNT(*) AS n FROM seen_mints
+                WHERE symbol = ? AND created_ts > ? AND created_ts < ?
+                """,
+                (symbol, created_ts, created_ts + 2 * 3600),
+            ).fetchone()
+        return int(row["n"] if row else 0)
+
     def older_same_name(self, symbol: str, name: str, created_ts: int) -> dict | None:
         symbol = (symbol or "").upper()
         name_l = (name or "").strip().lower()

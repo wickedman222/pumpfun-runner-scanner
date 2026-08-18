@@ -40,7 +40,16 @@ PROMO_BITS = (
     "pump.fun", "pump fun", "bonding curve", "presale", "goes to the moon",
     "market cap", "price surges", "all-time high", "dexscreener", "raydium",
     "pumpswap", "buy the dip", "new crypto", "solana token", "airdrop",
+    "coinmarketcap", "coingecko", "bybit", "coinpedia", "price prediction",
+    "price today", "live price", " to usd", "historical data", "know your meme",
 )
+
+WEAK_WORDS = {
+    "black", "white", "green", "bull", "bear", "bean", "build", "alive",
+    "online", "stars", "nice", "working", "hold", "king", "jungle", "silent",
+    "leader", "market", "retail", "magic", "block", "time", "chain", "love",
+    "coin", "token", "cat", "dog", "wolf", "fish", "bird", "moon", "sun",
+}
 
 NEWS_FEEDS = [
     "https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en",
@@ -93,7 +102,23 @@ def is_generic_ticker(symbol: str, name: str) -> bool:
     name_l = (name or "").strip().lower()
     if name_l in {"cat", "dog", "pepe", "moon", "coin", "token"}:
         return True
+    if name_l in WEAK_WORDS:
+        return True
     return False
+
+
+def is_novel_acronym(symbol: str, name: str) -> bool:
+    """USWS / UOTF / WWR / NTDA / Z500 style: short unique ticker, not a meme word."""
+    sym = re.sub(r"[^A-Z0-9]", "", (symbol or "").upper())
+    if len(sym) < 3 or len(sym) > 6:
+        return False
+    if not re.search(r"[A-Z]", sym):
+        return False
+    if sym in GENERIC_TICKERS or sym.lower() in WEAK_WORDS:
+        return False
+    if is_generic_ticker(symbol, name):
+        return False
+    return True
 
 
 def parse_rss(xml_text: str, source: str) -> list[Story]:
@@ -172,25 +197,32 @@ class Attention:
 
 def score_match(symbol: str, name: str, story: Story) -> int:
     """Higher = cleaner mapping of this mint onto an exogenous headline."""
-    if is_token_promo(story.title):
+    if is_token_promo(story.title) or is_token_promo(story.url):
         return 0
     title = story.title.lower()
     title_words = story.words
     sym = (symbol or "").lower().lstrip("$")
     name_l = (name or "").strip().lower()
-    name_words = extract_words(name)
+    name_words = {w for w in extract_words(name) if w not in WEAK_WORDS}
 
-    score = 0
-    if len(sym) >= 4 and (sym in title_words or f" {sym} " in f" {title} "):
-        score += 45
-    if name_l and len(name_l) >= 5 and name_l in title:
-        score += 40
+    name_in = bool(name_l) and len(name_l) >= 5 and name_l in title
+    ticker_in = len(sym) >= 4 and (sym in title_words or f" {sym} " in f" {title} ")
     overlap = name_words & title_words
     rare = {w for w in overlap if len(w) >= 5}
+    phrase = bool(name_l) and " " in name_l and name_l in title
+
+    # One shared weak word is not a story. Need the name/ticker or two rare words.
+    if not (name_in or ticker_in or phrase or len(rare) >= 2):
+        return 0
+
+    score = 0
+    if ticker_in:
+        score += 45
+    if name_in:
+        score += 40
     score += 18 * len(rare)
-    # two-word name phrase
-    if name_l and " " in name_l and name_l in title:
+    if phrase:
         score += 20
     if is_generic_ticker(symbol, name):
-        score = min(score, 30)
+        return 0
     return score

@@ -12,12 +12,16 @@ Repo: [github.com/wickedman222/pumpfun-runner-scanner](https://github.com/wicked
 
 ## What has to be true before a post
 
-Every gate must pass:
+Every gate must pass. A call can come from one of two paths:
 
-1. **Attention** — a real headline exists *outside crypto* (not a “new memecoin launched” article)
-2. **First-mover** — this is the first mint in our window that maps to that story
-3. **Structure** — dev is not a serial launcher, holders are not bundled/top-heavy, rugcheck is clean
-4. **Expansion** — after a wait, MC / replies still hold or grow (not an instant dump)
+1. **Tight news map** — the token *is* the headline (name/ticker in the story). Random shared words do not count. Crypto price articles do not count.
+2. **Meta first-mover** — this is the original ticker and copies are already launching (USWS/EYE/UOTF pattern).
+
+Then:
+
+- First look above ~$80k is skipped (already ran)
+- Structure must be clean (not a serial rug / bundled book)
+- After a wait, MC/replies must still expand
 
 Generic tickers (`PEPE`, `CAT`, `MOON`, …) are ignored on purpose.
 

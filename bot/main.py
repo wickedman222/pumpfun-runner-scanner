@@ -84,33 +84,19 @@ async def run() -> None:
                         continue
 
                     verdict = await evaluate_new(http, attention, state, coin)
-                    if verdict.failed_gate in {"attention", "generic", "age", "quota"}:
-                        continue
                     if verdict.failed_gate == "first-mover":
                         log.info("Skip %s first-mover: %s", coin.get("symbol"), verdict.fail_reason)
+                        await _maybe_promote_original(
+                            http, attention, state, pending, coin
+                        )
+                        continue
+                    if verdict.failed_gate in {"attention", "generic", "age", "quota", "late", "dumped"}:
                         continue
                     if verdict.failed_gate == "structure":
                         log.info("Skip %s structure: %s", coin.get("symbol"), verdict.fail_reason)
                         continue
-                    if verdict.failed_gate == "wait-expansion" and verdict.story:
-                        pending[coin["mint"]] = Pending(
-                            coin=coin,
-                            ready_at=time.time() + config.EXPANSION_WAIT_SEC,
-                            story_title=verdict.story.title,
-                            match_score=verdict.match_score,
-                            verdict_key=coin["mint"],
-                        )
-                        log.info(
-                            "Watching %s ($%s) match=%s — %s",
-                            coin.get("symbol"),
-                            coin.get("name"),
-                            verdict.match_score,
-                            verdict.story.title[:80],
-                        )
-                        # keep verdict fields on the coin for the later post
-                        coin["_story"] = verdict.story
-                        coin["_match"] = verdict.match_score
-                        coin["_structure"] = verdict.structure
+                    if verdict.failed_gate == "wait-expansion":
+                        _queue_watch(pending, coin, verdict)
 
                 due = [m for m, p in pending.items() if time.time() >= p.ready_at]
                 for mint in due:
@@ -150,6 +136,61 @@ async def run() -> None:
 
             elapsed = time.time() - loop_start
             await asyncio.sleep(max(1.0, config.PUMP_POLL_SEC - elapsed))
+
+
+def _queue_watch(pending: dict[str, Pending], coin: dict, verdict: Verdict) -> None:
+    if coin["mint"] in pending:
+        return
+    story = verdict.story
+    pending[coin["mint"]] = Pending(
+        coin=coin,
+        ready_at=time.time() + config.EXPANSION_WAIT_SEC,
+        story_title=(story.title if story else ""),
+        match_score=verdict.match_score,
+        verdict_key=coin["mint"],
+    )
+    coin["_story"] = story
+    coin["_match"] = verdict.match_score
+    coin["_structure"] = verdict.structure
+    log.info(
+        "Watching %s ($%s) path=%s match=%s — %s",
+        coin.get("symbol"),
+        coin.get("name"),
+        verdict.path or "news",
+        verdict.match_score,
+        (story.title[:80] if story else ""),
+    )
+
+
+async def _maybe_promote_original(
+    http, attention: Attention, state: State, pending: dict[str, Pending], copy: dict
+) -> None:
+    created = int(copy.get("created_timestamp") or 0)
+    if created > 10_000_000_000:
+        created = created // 1000
+    older = state.older_same_name(copy.get("symbol") or "", copy.get("name") or "", created)
+    if not older or not older.get("mint"):
+        return
+    mint = older["mint"]
+    if state.already_posted(mint) or mint in pending:
+        return
+    copies = state.same_symbol_copies(copy.get("symbol") or "", older.get("created_ts") or created)
+    if copies < config.META_COPY_MIN:
+        return
+    orig = await fetch_coin(http, mint)
+    if not orig:
+        return
+    verdict = await evaluate_new(http, attention, state, orig, force_path="meta")
+    if verdict.failed_gate == "wait-expansion":
+        log.info(
+            "Copy cluster on $%s — promoting original %s (%s copies)",
+            orig.get("symbol"),
+            mint[:8],
+            copies,
+        )
+        _queue_watch(pending, orig, verdict)
+    elif verdict.failed_gate == "structure":
+        log.info("Skip original %s structure: %s", orig.get("symbol"), verdict.fail_reason)
 
 
 async def _send_leaderboard(http, state: State, attention, scanned: int) -> None:
