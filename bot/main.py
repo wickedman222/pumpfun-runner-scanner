@@ -10,7 +10,7 @@ from . import config, health
 from .attention import Attention
 from .engine import Verdict, confirm_expansion, evaluate_new
 from .httputil import client
-from .pump import fetch_coin, latest_coins
+from .pump import fetch_coin, latest_coins, live_coins
 from .state import State
 from .telegram import boot_message, format_leaderboard, format_signal, send
 
@@ -70,17 +70,21 @@ async def run() -> None:
                     last_attention = time.time()
                     health.STATUS["attention"] = len(attention.stories)
 
-                coins = await latest_coins(http, limit=40)
-                for coin in coins:
-                    if not coin.get("mint"):
+                fresh = await latest_coins(http, limit=40)
+                streaming = await live_coins(http, limit=20)
+                seen_this_loop: set[str] = set()
+                for coin in fresh + streaming:
+                    mint = coin.get("mint")
+                    if not mint or mint in seen_this_loop:
                         continue
+                    seen_this_loop.add(mint)
                     is_new = state.mark_seen(coin)
-                    health.STATUS["seen"] = health.STATUS.get("seen", 0) + (1 if is_new else 0)
-                    if not is_new:
+                    if is_new:
+                        health.STATUS["seen"] = health.STATUS.get("seen", 0) + 1
+                    if state.already_posted(mint) or mint in pending:
                         continue
-                    if state.already_posted(coin["mint"]):
-                        continue
-                    if coin["mint"] in pending:
+                    # Re-check already-seen coins only if they just went live.
+                    if not is_new and not coin.get("is_currently_live"):
                         continue
 
                     verdict = await evaluate_new(http, attention, state, coin)

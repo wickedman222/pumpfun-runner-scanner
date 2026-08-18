@@ -71,7 +71,9 @@ async def evaluate_new(
         return v
 
     age = age_seconds(coin, time.time())
-    if age > config.MAX_TOKEN_AGE_SEC:
+    live = bool(coin.get("is_currently_live"))
+    max_age = config.MAX_LIVE_AGE_SEC if live else config.MAX_TOKEN_AGE_SEC
+    if age > max_age:
         v.failed_gate = "age"
         v.fail_reason = f"too old ({age/60:.0f}m)"
         return v
@@ -124,13 +126,28 @@ async def evaluate_new(
                 scored.append((item, s))
         scored.sort(key=lambda x: x[1], reverse=True)
         hits = scored
-    if not hits or hits[0][1] < config.MIN_MATCH_SCORE:
+    path = ""
+    story = None
+    match_score = 0
+    if hits and hits[0][1] >= config.MIN_MATCH_SCORE:
+        path = "news"
+        story, match_score = hits[0]
+    elif live:
+        # 2025–26 real runners often started as a live stream, not a newspaper.
+        # Still banned if BOOST/cashback/dead-chat already fired above.
+        path = "live"
+        match_score = 85
+        title = coin.get("livestream_title") or coin.get("name") or coin.get("symbol")
+        story = Story(
+            title=f"Livestream live: {title}",
+            url=coin.get("url") or "",
+            source="live",
+            seen_at=time.time(),
+        )
+    else:
         v.failed_gate = "attention"
         v.fail_reason = "no exogenous first-mover story"
         return v
-
-    path = "news"
-    story, match_score = hits[0]
 
     structure = await inspect(http, coin)
     v.structure = structure
@@ -175,7 +192,10 @@ async def confirm_expansion(http: httpx.AsyncClient, coin: dict, prev: dict) -> 
         expanding = True
         reasons.append("graduated during wait")
     if fresh.get("is_currently_live"):
-        reasons.append("livestream live")
+        expanding = True
+        reasons.append("livestream still live")
+    if prev.get("is_currently_live") and not fresh.get("is_currently_live") and not expanding:
+        return False, "livestream died and book did not expand", fresh
 
     farm = extract_farm_reason(fresh)
     if farm:

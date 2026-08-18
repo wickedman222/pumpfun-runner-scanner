@@ -12,15 +12,21 @@ Repo: [github.com/wickedman222/pumpfun-runner-scanner](https://github.com/wicked
 
 ## What has to be true before a post
 
-Every gate must pass:
+Every gate must pass. A call comes from one of two **real** paths:
 
-1. **Tight news map** — the token *is* the headline. Random shared words and crypto price articles do not count.
-2. **First-mover** of that story.
-3. **Not a painted book** — skip BOOST/Mayhem coins, fake US fund/reserve metas (USWS, UOTF, WWR, NTDA, EYE, Z500), copy-ticker farms, and any book that is already big with **zero replies** or a one-way ATH≈spot tape. The Pump contract is clean; the *chart* is the honeypot (bots buy, you cannot exit into real flow).
-4. **Structure** — not a serial rug / bundled book.
-5. **Expansion** after a short wait.
+1. **Tight news map** — the token *is* the headline (PNUT / Moo Deng). Shared words and crypto price articles do not count.
+2. **Clean livestream** — first mint, still live, BOOST/cashback **off**, book not a farm. This is how a lot of 2025–26 organic runners actually started.
 
-First look above ~$80k is skipped (already ran).
+Never:
+
+- BOOST / Mayhem / cashback painted books (USWS, EYE, UOTF, WWR, Z500…)
+- Fake US fund/reserve names
+- Copy-ticker farms
+- Big MC + **zero replies** or ATH≈spot tape
+- First look already above ~$80k
+- Serial-rug / bundled structure
+
+Historical real names (GOAT, PNUT, MOODENG, FARTCOIN, FWOG) were `boost_mode=NONE` with real chat. The $100M “runners” from Aug 2026 were `boost_mode=COMPLETED` and 0 replies.
 
 Generic tickers (`PEPE`, `CAT`, `MOON`, …) are ignored on purpose.
 

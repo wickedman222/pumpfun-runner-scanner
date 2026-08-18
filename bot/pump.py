@@ -37,6 +37,7 @@ def normalize_coin(raw: dict) -> dict:
         "ath_market_cap": ath,
         "reply_count": int(raw.get("reply_count") or 0),
         "is_currently_live": bool(raw.get("is_currently_live")),
+        "livestream_title": (raw.get("livestream_title") or "").strip(),
         "twitter": raw.get("twitter") or "",
         "telegram": raw.get("telegram") or "",
         "website": raw.get("website") or "",
@@ -57,6 +58,17 @@ async def latest_coins(http: httpx.AsyncClient, limit: int = 50) -> list[dict]:
     url = (
         f"{config.PUMP_API}/coins?offset=0&limit={limit}"
         "&sort=created_timestamp&order=DESC&includeNsfw=false"
+    )
+    data = await get_json(http, url)
+    if not isinstance(data, list):
+        return []
+    return [normalize_coin(c) for c in data if c.get("mint")]
+
+
+async def live_coins(http: httpx.AsyncClient, limit: int = 20) -> list[dict]:
+    url = (
+        f"{config.PUMP_API}/coins/currently-live"
+        f"?offset=0&limit={limit}&includeNsfw=false"
     )
     data = await get_json(http, url)
     if not isinstance(data, list):

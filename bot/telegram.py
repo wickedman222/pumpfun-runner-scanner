@@ -157,8 +157,8 @@ def format_leaderboard(rows: list[dict], scanned: int, headlines: int) -> str:
 async def boot_message(http: httpx.AsyncClient) -> None:
     text = (
         "<b>Pump.fun runner scanner online</b>\n"
-        "Calls only on a tight real-world story + clean book.\n"
-        "Fake fund/reserve metas and dead-chat pumps are skipped.\n"
+        "Calls: tight real-world story, or a clean live stream.\n"
+        "BOOST / cashback / fake-fund / dead-chat books are never called.\n"
         f"Leaderboard every {config.LEADERBOARD_SEC // 3600}h"
     )
     ok = await send(http, text)
