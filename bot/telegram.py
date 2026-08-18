@@ -246,7 +246,7 @@ async def boot_message(http: httpx.AsyncClient) -> None:
     )
     if config.PAPER_ENABLED:
         text += (
-            f"\n\n<b>Paper book {config.PAPER_START_SOL:.2f} SOL</b> — no real fills.\n"
+            f"\n\n<b>Paper book reset: {config.PAPER_START_SOL:.2f} SOL</b> — no real fills.\n"
             f"Size {config.PAPER_SIZE_FRAC * 100:.1f}% of equity "
             f"({config.PAPER_SIZE_MIN:.2f}–{config.PAPER_SIZE_MAX:.2f}), "
             f"max {config.PAPER_MAX_OPEN} open."

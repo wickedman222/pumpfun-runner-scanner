@@ -102,6 +102,9 @@ class State:
             for col, typ in wanted.items():
                 if col not in existing:
                     con.execute(f"ALTER TABLE posted ADD COLUMN {col} {typ}")
+            paper_cols = {row[1] for row in con.execute("PRAGMA table_info(paper_wallet)")}
+            if paper_cols and "book_id" not in paper_cols:
+                con.execute("ALTER TABLE paper_wallet ADD COLUMN book_id TEXT")
 
     @contextmanager
     def _conn(self):
@@ -236,11 +239,45 @@ class State:
             if not row:
                 now = int(time.time())
                 con.execute(
-                    "INSERT INTO paper_wallet(id, cash_sol, starting_sol, updated_at) VALUES (1,?,?,?)",
-                    (starting, starting, now),
+                    "INSERT INTO paper_wallet(id, cash_sol, starting_sol, updated_at, book_id) VALUES (1,?,?,?,?)",
+                    (starting, starting, now, config.PAPER_BOOK_ID),
                 )
-                return {"cash_sol": starting, "starting_sol": starting, "updated_at": now}
+                return {
+                    "cash_sol": starting,
+                    "starting_sol": starting,
+                    "updated_at": now,
+                    "book_id": config.PAPER_BOOK_ID,
+                }
         return dict(row)
+
+    def reset_paper_book(self, starting: float, book_id: str, reason: str = "book reset") -> dict:
+        now = int(time.time())
+        with self._conn() as con:
+            con.execute(
+                """
+                UPDATE paper_positions
+                SET remaining_qty_sol = 0, remaining_frac = 0, status = 'closed',
+                    close_reason = ?, closed_at = ?
+                WHERE status IN ('open', 'moonbag')
+                """,
+                (reason, now),
+            )
+            row = con.execute("SELECT 1 FROM paper_wallet WHERE id = 1").fetchone()
+            if row:
+                con.execute(
+                    """
+                    UPDATE paper_wallet
+                    SET cash_sol = ?, starting_sol = ?, updated_at = ?, book_id = ?
+                    WHERE id = 1
+                    """,
+                    (starting, starting, now, book_id),
+                )
+            else:
+                con.execute(
+                    "INSERT INTO paper_wallet(id, cash_sol, starting_sol, updated_at, book_id) VALUES (1,?,?,?,?)",
+                    (starting, starting, now, book_id),
+                )
+        return self.paper_wallet()
 
     def paper_wallet(self) -> dict:
         with self._conn() as con:

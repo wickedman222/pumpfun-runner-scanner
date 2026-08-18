@@ -105,6 +105,8 @@ META_COPY_MIN = _int("META_COPY_MIN", 2)
 # --- Paper book (no real SOL) ---
 PAPER_ENABLED = _int("PAPER_ENABLED", 1) == 1
 PAPER_START_SOL = _float("PAPER_START_SOL", 2.0)
+# Bump this string to flatten the paper book and start from PAPER_START_SOL again.
+PAPER_BOOK_ID = _env("PAPER_BOOK_ID", "overnight-1")
 PAPER_SIZE_FRAC = _float("PAPER_SIZE_FRAC", 0.075)  # 2 SOL → 0.15
 PAPER_SIZE_MIN = _float("PAPER_SIZE_MIN", 0.10)
 PAPER_SIZE_MAX = _float("PAPER_SIZE_MAX", 0.20)

@@ -46,7 +46,19 @@ async def run() -> None:
     config.require_telegram()
     state = State()
     if config.PAPER_ENABLED:
-        state.ensure_paper_wallet(config.PAPER_START_SOL)
+        wallet = state.ensure_paper_wallet(config.PAPER_START_SOL)
+        if (wallet.get("book_id") or "") != config.PAPER_BOOK_ID:
+            log.info(
+                "Resetting paper book %s → %s at %.3f SOL",
+                wallet.get("book_id"),
+                config.PAPER_BOOK_ID,
+                config.PAPER_START_SOL,
+            )
+            state.reset_paper_book(
+                config.PAPER_START_SOL,
+                config.PAPER_BOOK_ID,
+                reason=f"reset to {config.PAPER_BOOK_ID}",
+            )
         health.STATUS["paper_equity"] = round(paper.snapshot(state)["equity"], 4)
     attention = Attention()
     pending: dict[str, Pending] = {}
