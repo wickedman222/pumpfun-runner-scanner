@@ -46,6 +46,9 @@ def normalize_coin(raw: dict) -> dict:
         "associated_bonding_curve": raw.get("associated_bonding_curve") or "",
         "pool_address": raw.get("pool_address") or "",
         "curve_pct": round(curve_pct, 1),
+        "boost_mode": str(raw.get("boost_mode") or "NONE").upper(),
+        "mayhem_state": str(raw.get("mayhem_state") or raw.get("mayhem") or "").upper(),
+        "is_cashback_enabled": bool(raw.get("is_cashback_enabled")),
         "url": f"{config.PUMP_WEB}/{raw.get('mint')}" if raw.get("mint") else "",
     }
 

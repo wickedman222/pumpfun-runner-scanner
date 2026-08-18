@@ -16,7 +16,7 @@ Every gate must pass:
 
 1. **Tight news map** — the token *is* the headline. Random shared words and crypto price articles do not count.
 2. **First-mover** of that story.
-3. **Not a farm** — skip fake US fund/reserve metas (USWS, UOTF, WWR, NTDA, EYE, Z500, …), copy-ticker clusters, and any book that is already big with **zero replies** (wash / extract, even if the Pump contract is clean).
+3. **Not a painted book** — skip BOOST/Mayhem coins, fake US fund/reserve metas (USWS, UOTF, WWR, NTDA, EYE, Z500), copy-ticker farms, and any book that is already big with **zero replies** or a one-way ATH≈spot tape. The Pump contract is clean; the *chart* is the honeypot (bots buy, you cannot exit into real flow).
 4. **Structure** — not a serial rug / bundled book.
 5. **Expansion** after a short wait.
 
