@@ -95,8 +95,7 @@ MIN_UNIQUE_HOLDERS = _int("MIN_UNIQUE_HOLDERS", 25)
 MIN_MATCH_SCORE = _int("MIN_MATCH_SCORE", 90)
 # First look above this is already late (the run already happened).
 MAX_FIRST_LOOK_MC = _float("MAX_FIRST_LOOK_MC", 80_000)
-# Original of a copy-cluster can still be called a bit later.
-MAX_META_MC = _float("MAX_META_MC", 5_000_000)
+# Copy farms (USWS/EYE style) — skip the whole ticker family, do not promote the original.
 META_COPY_MIN = _int("META_COPY_MIN", 2)
 
 # Known AMM / pool authorities — not "holders"

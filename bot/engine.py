@@ -10,8 +10,8 @@ from . import config
 from .attention import (
     Attention,
     Story,
+    extract_farm_reason,
     is_generic_ticker,
-    is_novel_acronym,
     score_match,
 )
 from .pump import age_seconds, fetch_coin
@@ -54,16 +54,11 @@ class Verdict:
     path: str = ""
 
 
-def _synthetic(title: str, source: str) -> Story:
-    return Story(title=title, url="", source=source, seen_at=time.time())
-
-
 async def evaluate_new(
     http: httpx.AsyncClient,
     attention: Attention,
     state: State,
     coin: dict,
-    force_path: str | None = None,
 ) -> Verdict:
     mint = coin["mint"]
     v = Verdict(post=False, mint=mint, coin=coin)
@@ -76,7 +71,7 @@ async def evaluate_new(
         return v
 
     age = age_seconds(coin, time.time())
-    if age > config.MAX_TOKEN_AGE_SEC and force_path != "meta":
+    if age > config.MAX_TOKEN_AGE_SEC:
         v.failed_gate = "age"
         v.fail_reason = f"too old ({age/60:.0f}m)"
         return v
@@ -84,6 +79,12 @@ async def evaluate_new(
     if is_generic_ticker(coin.get("symbol", ""), coin.get("name", "")):
         v.failed_gate = "generic"
         v.fail_reason = "generic ticker/name"
+        return v
+
+    farm = extract_farm_reason(coin)
+    if farm:
+        v.failed_gate = "farm"
+        v.fail_reason = farm
         return v
 
     if ath > 8_000 and usd < 0.4 * ath:
@@ -98,64 +99,38 @@ async def evaluate_new(
         v.fail_reason = f"older mint already exists: {older['mint'][:8]}…"
         return v
 
-    # Late first look = the run already happened (Stonks/GTAVI at $300k+).
-    cap = config.MAX_META_MC if force_path == "meta" else config.MAX_FIRST_LOOK_MC
-    if usd > cap:
+    copies = state.same_symbol_copies(coin.get("symbol") or "", created_ts)
+    if copies >= config.META_COPY_MIN:
+        v.failed_gate = "farm"
+        v.fail_reason = f"copy farm ({copies} same-ticker launches)"
+        return v
+
+    if usd > config.MAX_FIRST_LOOK_MC:
         v.failed_gate = "late"
         v.fail_reason = f"already ${usd:,.0f} on first look"
         return v
 
-    copies = state.same_symbol_copies(coin.get("symbol") or "", created_ts)
-    path = ""
-    story: Story | None = None
-    match_score = 0
-
-    if force_path == "meta" or copies >= config.META_COPY_MIN:
-        path = "meta"
-        match_score = 100
-        story = _synthetic(
-            f"First mint of ${coin.get('symbol')} — {copies} copies already launched",
-            "meta",
+    hits = attention.match_coin(coin["symbol"], coin["name"])
+    name = coin.get("name") or ""
+    distinctive = (" " in name.strip() and len(name) >= 6) or len(name) >= 8
+    if not hits and distinctive and _allow_targeted_search():
+        targeted = await attention.search_subject(
+            http, f'"{name}"' if " " in name else name
         )
-
-    if not path:
-        hits = attention.match_coin(coin["symbol"], coin["name"])
-        name = coin.get("name") or ""
-        distinctive = (" " in name.strip() and len(name) >= 6) or len(name) >= 8
-        if not hits and distinctive and _allow_targeted_search():
-            targeted = await attention.search_subject(
-                http, f'"{name}"' if " " in name else name
-            )
-            scored = []
-            for item in targeted:
-                s = score_match(coin["symbol"], coin["name"], item)
-                if s >= config.MIN_MATCH_SCORE:
-                    scored.append((item, s))
-            scored.sort(key=lambda x: x[1], reverse=True)
-            hits = scored
-        if hits and hits[0][1] >= config.MIN_MATCH_SCORE:
-            path = "news"
-            story, match_score = hits[0]
-
-    if not path and is_novel_acronym(coin.get("symbol") or "", coin.get("name") or ""):
-        early = 5_000 <= usd <= config.MAX_FIRST_LOOK_MC
-        traction = (
-            bool(coin.get("complete"))
-            or float(coin.get("curve_pct") or 0) >= 25
-            or int(coin.get("reply_count") or 0) >= 4
-        )
-        if early and traction:
-            path = "acronym"
-            match_score = 90
-            story = _synthetic(
-                f"Novel ticker ${coin.get('symbol')} filling early with a clean book",
-                "acronym",
-            )
-
-    if not path:
+        scored = []
+        for item in targeted:
+            s = score_match(coin["symbol"], coin["name"], item)
+            if s >= config.MIN_MATCH_SCORE:
+                scored.append((item, s))
+        scored.sort(key=lambda x: x[1], reverse=True)
+        hits = scored
+    if not hits or hits[0][1] < config.MIN_MATCH_SCORE:
         v.failed_gate = "attention"
-        v.fail_reason = "no story / no copy-cluster / no early acronym bid"
+        v.fail_reason = "no exogenous first-mover story"
         return v
+
+    path = "news"
+    story, match_score = hits[0]
 
     structure = await inspect(http, coin)
     v.structure = structure
@@ -201,6 +176,10 @@ async def confirm_expansion(http: httpx.AsyncClient, coin: dict, prev: dict) -> 
         reasons.append("graduated during wait")
     if fresh.get("is_currently_live"):
         reasons.append("livestream live")
+
+    farm = extract_farm_reason(fresh)
+    if farm:
+        return False, farm, fresh
 
     if not expanding and now_usd >= prev_usd and now_replies >= prev_replies and now_usd >= 8_000:
         expanding = True

@@ -12,16 +12,15 @@ Repo: [github.com/wickedman222/pumpfun-runner-scanner](https://github.com/wicked
 
 ## What has to be true before a post
 
-Every gate must pass. A call can come from one of two paths:
+Every gate must pass:
 
-1. **Tight news map** — the token *is* the headline (name/ticker in the story). Random shared words do not count. Crypto price articles do not count.
-2. **Meta first-mover** — this is the original ticker and copies are already launching (USWS/EYE/UOTF pattern).
+1. **Tight news map** — the token *is* the headline. Random shared words and crypto price articles do not count.
+2. **First-mover** of that story.
+3. **Not a farm** — skip fake US fund/reserve metas (USWS, UOTF, WWR, NTDA, EYE, Z500, …), copy-ticker clusters, and any book that is already big with **zero replies** (wash / extract, even if the Pump contract is clean).
+4. **Structure** — not a serial rug / bundled book.
+5. **Expansion** after a short wait.
 
-Then:
-
-- First look above ~$80k is skipped (already ran)
-- Structure must be clean (not a serial rug / bundled book)
-- After a wait, MC/replies must still expand
+First look above ~$80k is skipped (already ran).
 
 Generic tickers (`PEPE`, `CAT`, `MOON`, …) are ignored on purpose.
 

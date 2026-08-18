@@ -107,18 +107,39 @@ def is_generic_ticker(symbol: str, name: str) -> bool:
     return False
 
 
-def is_novel_acronym(symbol: str, name: str) -> bool:
-    """USWS / UOTF / WWR / NTDA / Z500 style: short unique ticker, not a meme word."""
+FAKE_OFFICIAL_TICKERS = {
+    "USWS", "USWR", "UOTF", "UATF", "WWR", "NTDA", "Z500", "ZTERM",
+    "EYE", "LAYOOO",
+}
+
+FAKE_OFFICIAL_PHRASES = (
+    "united states", "united oil", "united american", "united water",
+    "trust fund", "water supply", "water reserve", "world water",
+    "digital account", "national trump", "federal reserve",
+    "bulls's eye", "bulls eye", "strategic reserve", "treasury fund",
+    "oil trust", "american trust",
+)
+
+
+def is_fake_official(symbol: str, name: str) -> bool:
+    """Manufactured 'US agency / fund / reserve' extract metas. Contract is clean; the play is not."""
     sym = re.sub(r"[^A-Z0-9]", "", (symbol or "").upper())
-    if len(sym) < 3 or len(sym) > 6:
-        return False
-    if not re.search(r"[A-Z]", sym):
-        return False
-    if sym in GENERIC_TICKERS or sym.lower() in WEAK_WORDS:
-        return False
-    if is_generic_ticker(symbol, name):
-        return False
-    return True
+    if sym in FAKE_OFFICIAL_TICKERS:
+        return True
+    blob = f"{symbol or ''} {name or ''}".lower()
+    return any(p in blob for p in FAKE_OFFICIAL_PHRASES)
+
+
+def extract_farm_reason(coin: dict) -> str:
+    """Wash / copy-farm / fake-official. Pump contracts look clean; these still are not calls."""
+    usd = float(coin.get("usd_market_cap") or coin.get("ath_market_cap") or 0)
+    replies = int(coin.get("reply_count") or 0)
+    if is_fake_official(coin.get("symbol") or "", coin.get("name") or ""):
+        return "fake official / fund-reserve meta"
+    # Real runners have chat. $20k+ with zero replies is wash or a honeypot book.
+    if usd >= 20_000 and replies <= 0:
+        return f"dead chat at ${usd:,.0f} (0 replies)"
+    return ""
 
 
 def parse_rss(xml_text: str, source: str) -> list[Story]:

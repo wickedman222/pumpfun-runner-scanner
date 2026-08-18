@@ -86,9 +86,9 @@ async def run() -> None:
                     verdict = await evaluate_new(http, attention, state, coin)
                     if verdict.failed_gate == "first-mover":
                         log.info("Skip %s first-mover: %s", coin.get("symbol"), verdict.fail_reason)
-                        await _maybe_promote_original(
-                            http, attention, state, pending, coin
-                        )
+                        continue
+                    if verdict.failed_gate == "farm":
+                        log.info("Skip %s farm: %s", coin.get("symbol"), verdict.fail_reason)
                         continue
                     if verdict.failed_gate in {"attention", "generic", "age", "quota", "late", "dumped"}:
                         continue
@@ -160,37 +160,6 @@ def _queue_watch(pending: dict[str, Pending], coin: dict, verdict: Verdict) -> N
         verdict.match_score,
         (story.title[:80] if story else ""),
     )
-
-
-async def _maybe_promote_original(
-    http, attention: Attention, state: State, pending: dict[str, Pending], copy: dict
-) -> None:
-    created = int(copy.get("created_timestamp") or 0)
-    if created > 10_000_000_000:
-        created = created // 1000
-    older = state.older_same_name(copy.get("symbol") or "", copy.get("name") or "", created)
-    if not older or not older.get("mint"):
-        return
-    mint = older["mint"]
-    if state.already_posted(mint) or mint in pending:
-        return
-    copies = state.same_symbol_copies(copy.get("symbol") or "", older.get("created_ts") or created)
-    if copies < config.META_COPY_MIN:
-        return
-    orig = await fetch_coin(http, mint)
-    if not orig:
-        return
-    verdict = await evaluate_new(http, attention, state, orig, force_path="meta")
-    if verdict.failed_gate == "wait-expansion":
-        log.info(
-            "Copy cluster on $%s — promoting original %s (%s copies)",
-            orig.get("symbol"),
-            mint[:8],
-            copies,
-        )
-        _queue_watch(pending, orig, verdict)
-    elif verdict.failed_gate == "structure":
-        log.info("Skip original %s structure: %s", orig.get("symbol"), verdict.fail_reason)
 
 
 async def _send_leaderboard(http, state: State, attention, scanned: int) -> None:
