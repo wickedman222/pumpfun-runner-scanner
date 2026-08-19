@@ -12,7 +12,7 @@ Repo: [github.com/wickedman222/pumpfun-runner-scanner](https://github.com/wicked
 
 ## What has to be true before a post
 
-Every gate must pass. There is **no daily trade cap** — if several names hit the trigger, we take them (paper still max 2 open at once).
+Every gate must pass. There is **no daily trade cap** — if several names hit the trigger, we take them (paper still max 5 open at once).
 
 1. **See every launch** — `latest` plus last-trade, graduates, and a refetch of young mints we already stored (so a coin that leaves `latest` at $4k is still followed).
 2. **Arm** on the first print in **$8k–$200k**.
@@ -61,7 +61,7 @@ Every 6 hours it also posts an **all-time top 15** of calls ranked by ATH multip
 
 ## Paper book
 
-Starts at **2 SOL** (not real). A call buys **7.5% of equity** (0.15 SOL at the start, floored at 0.10, capped at 0.20). Above $80k MC the size is 70% (still take the graduate). Hard skip only above ~$200k. Max **3** open names. Fills assume 1% fee, 8% entry slip, 5% exit slip.
+Starts at **2 SOL** (not real). A call buys **7.5% of equity** (0.15 SOL at the start, floored at 0.10, capped at 0.20). Above $80k MC the size is 70% (still take the graduate). Hard skip only above ~$200k. Max **5** open. Fills assume 1% fee, 8% entry slip, 5% exit slip.
 
 | Level | Action |
 |---|---|
