@@ -65,13 +65,14 @@ Starts at **2 SOL** (not real). A call buys **7.5% of equity** (0.15 SOL at the 
 
 | Level | Action |
 |---|---|
-| −45% from entry | Flatten — dead |
-| 2 hours and never 1.6x | Flatten — no go |
+| −45% from entry | Flatten — dead (before first take-profit) |
 | Live path, stream dies, still &lt; 1.2x | Flatten |
-| **2x** | Sell 40% |
-| **4x** | Sell 30% (30% moonbag left) |
-| **10x** | Sell half the moonbag |
-| After 2x, −50% off post-entry ATH | Trail the rest |
+| **2x** | Sell 25% |
+| **4x** | Sell 25% (50% moonbag left) |
+| **10x** | Clip part of the moonbag |
+| After 4x, −65% off post-entry ATH | Trail the rest |
+
+No 2-hour “must 1.6x” flatten — that killed grind-then-run names. Dead books still hit the −45% stop.
 
 Size grows if the book grows, shrinks if it draws down. Telegram gets a **paper balance report every 2 hours**. Set `PAPER_ENABLED=0` to turn it off. `PAPER_START_SOL` only applies on first boot of an empty wallet. `PAPER_REPORT_SEC` defaults to `7200`.
 

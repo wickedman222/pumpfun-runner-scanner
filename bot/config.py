@@ -133,16 +133,17 @@ PAPER_MIN_EQUITY = _float("PAPER_MIN_EQUITY", 0.25)
 PAPER_FEE = _float("PAPER_FEE", 0.01)
 PAPER_ENTRY_SLIP = _float("PAPER_ENTRY_SLIP", 0.08)
 PAPER_EXIT_SLIP = _float("PAPER_EXIT_SLIP", 0.05)
-PAPER_STOP_FRAC = _float("PAPER_STOP_FRAC", 0.55)  # flatten at −45%
-PAPER_TIME_DEAD_SEC = _int("PAPER_TIME_DEAD_SEC", 2 * 3600)
+PAPER_STOP_FRAC = _float("PAPER_STOP_FRAC", 0.55)  # flatten at −45% while still full size
+# 0 = off. 2h-must-1.6x flattened Jimothy/ANSEM-class before the real leg.
+PAPER_TIME_DEAD_SEC = _int("PAPER_TIME_DEAD_SEC", 0)
 PAPER_TIME_DEAD_MULT = _float("PAPER_TIME_DEAD_MULT", 1.6)
 PAPER_TP1_MULT = _float("PAPER_TP1_MULT", 2.0)
-PAPER_TP1_SELL = _float("PAPER_TP1_SELL", 0.40)
+PAPER_TP1_SELL = _float("PAPER_TP1_SELL", 0.25)  # take a slice, leave the runner
 PAPER_TP2_MULT = _float("PAPER_TP2_MULT", 4.0)
-PAPER_TP2_SELL = _float("PAPER_TP2_SELL", 0.30)  # of original; leaves ~30% moonbag
+PAPER_TP2_SELL = _float("PAPER_TP2_SELL", 0.25)  # of original; leaves ~50% moonbag
 PAPER_TP3_MULT = _float("PAPER_TP3_MULT", 10.0)
-PAPER_TP3_SELL = _float("PAPER_TP3_SELL", 0.15)  # half the moonbag
-PAPER_TRAIL_GIVEBACK = _float("PAPER_TRAIL_GIVEBACK", 0.50)  # sell rest if −50% off post-entry ATH after TP1
+PAPER_TP3_SELL = _float("PAPER_TP3_SELL", 0.20)  # clip part of the moonbag
+PAPER_TRAIL_GIVEBACK = _float("PAPER_TRAIL_GIVEBACK", 0.65)  # −65% off ATH, only after TP2
 PAPER_REPORT_SEC = _int("PAPER_REPORT_SEC", 2 * 3600)
 
 # Known AMM / pool authorities — not "holders"

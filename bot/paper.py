@@ -234,7 +234,8 @@ def decide(pos: dict, coin: dict) -> list[tuple[float, str]]:
         return [(left, f"dead: stop {multiple:.2f}x")]
 
     if (
-        not tp1
+        config.PAPER_TIME_DEAD_SEC > 0
+        and not tp1
         and held >= config.PAPER_TIME_DEAD_SEC
         and multiple < config.PAPER_TIME_DEAD_MULT
     ):
@@ -250,7 +251,9 @@ def decide(pos: dict, coin: dict) -> list[tuple[float, str]]:
     ):
         return [(left, f"dead: livestream died {multiple:.2f}x")]
 
-    if tp1 and entry and ath > 0 and mc <= ath * (1.0 - config.PAPER_TRAIL_GIVEBACK):
+    # Trail only after 4x. Real runners routinely dip ~50% off ATH before the next leg
+    # (PANTS −53%, FISHBONE −61%). Trailing from 2x sold the bag on a normal pullback.
+    if tp2 and entry and ath > 0 and mc <= ath * (1.0 - config.PAPER_TRAIL_GIVEBACK):
         return [(left, f"trail: gave back {multiple:.2f}x vs ATH {ath/entry:.2f}x")]
 
     if not tp1 and multiple >= config.PAPER_TP1_MULT:

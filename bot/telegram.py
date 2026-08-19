@@ -182,10 +182,10 @@ def format_paper_fill(fill, snap: dict) -> str:
             f"path {_esc(pos.get('path') or '—')}",
             "",
             "<b>PLAN</b>",
-            f"stop −{int((1 - config.PAPER_STOP_FRAC) * 100)}% · flatten if dead {config.PAPER_TIME_DEAD_SEC // 60}m",
+            f"stop −{int((1 - config.PAPER_STOP_FRAC) * 100)}% while full size",
             f"sell {int(config.PAPER_TP1_SELL * 100)}% at {config.PAPER_TP1_MULT:.1f}x",
             f"sell {int(config.PAPER_TP2_SELL * 100)}% at {config.PAPER_TP2_MULT:.1f}x",
-            f"moonbag {int((1 - config.PAPER_TP1_SELL - config.PAPER_TP2_SELL) * 100)}% · clip half at {config.PAPER_TP3_MULT:.0f}x · trail −{int(config.PAPER_TRAIL_GIVEBACK * 100)}% off ATH",
+            f"moonbag {int((1 - config.PAPER_TP1_SELL - config.PAPER_TP2_SELL) * 100)}% · clip some at {config.PAPER_TP3_MULT:.0f}x · trail −{int(config.PAPER_TRAIL_GIVEBACK * 100)}% off ATH after 4x",
         ]
     else:
         left = float(pos.get("remaining_frac") or 0)

@@ -62,10 +62,14 @@ def main() -> None:
     pos["tp1_hit"] = 1
     pos["tp2_hit"] = 1
     pos["ath_mc"] = 80_000
-    pos["remaining_frac"] = 0.30
-    acts = decide(pos, coin("m1", 30_000, ath=80_000))
+    pos["remaining_frac"] = 0.50
+    # −65% of 80k = 28k. 20k should trail; 40k (50% off) should not.
+    acts = decide(pos, coin("m1", 40_000, ath=80_000))
+    assert not acts, acts
+    acts = decide(pos, coin("m1", 20_000, ath=80_000))
     assert acts and acts[0][1].startswith("trail"), acts
 
+    # 3h grind under 1.6x must stay open — no 2h no-go.
     pos = {
         "entry_mc": 20_000,
         "ath_mc": 22_000,
@@ -74,10 +78,10 @@ def main() -> None:
         "tp1_hit": 0,
         "tp2_hit": 0,
         "tp3_hit": 0,
-        "path": "character",
+        "path": "tape",
     }
     acts = decide(pos, coin("m2", 22_000))
-    assert acts and acts[0][1].startswith("dead: no go"), acts
+    assert acts == [], acts
 
     print("paper rules ok")
 
