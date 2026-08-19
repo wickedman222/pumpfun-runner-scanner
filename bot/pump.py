@@ -66,7 +66,7 @@ async def latest_coins(http: httpx.AsyncClient, limit: int = 50) -> list[dict]:
     return [normalize_coin(c) for c in data if c.get("mint")]
 
 
-async def active_coins(http: httpx.AsyncClient, limit: int = 30) -> list[dict]:
+async def active_coins(http: httpx.AsyncClient, limit: int = 80) -> list[dict]:
     """Homepage-like tape: last trade, not brand-new spam. Farm filter still applies."""
     url = (
         f"{config.PUMP_API}/coins?offset=0&limit={limit}"
@@ -74,6 +74,20 @@ async def active_coins(http: httpx.AsyncClient, limit: int = 30) -> list[dict]:
     )
     data = await get_json(http, url)
     if not isinstance(data, list):
+        log.warning("last_trade feed empty/fail")
+        return []
+    return [normalize_coin(c) for c in data if c.get("mint")]
+
+
+async def graduated_coins(http: httpx.AsyncClient, limit: int = 25) -> list[dict]:
+    """Newest bonding-curve fills. FISHBONE-class leaves `latest` after ~1m."""
+    url = (
+        f"{config.PUMP_API}/coins?offset=0&limit={limit}"
+        "&sort=created_timestamp&order=DESC&includeNsfw=false&complete=true"
+    )
+    data = await get_json(http, url)
+    if not isinstance(data, list):
+        log.warning("graduated feed empty/fail")
         return []
     return [normalize_coin(c) for c in data if c.get("mint")]
 

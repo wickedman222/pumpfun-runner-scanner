@@ -147,40 +147,47 @@ async def evaluate_new(
     return v
 
 
-async def confirm_expansion(http: httpx.AsyncClient, coin: dict, prev: dict) -> tuple[bool, str, dict]:
+async def confirm_expansion(
+    http: httpx.AsyncClient, coin: dict, first_look: dict
+) -> tuple[str, str, dict]:
+    """Return (post|wait|drop, reason, fresh).
+
+    Expansion is vs the first eligible print, not vs a 3-minute local top.
+    FISHBONE sat $106k → $93k then printed $200k+ eight minutes later.
+    """
     fresh = await fetch_coin(http, coin["mint"])
     if not fresh:
-        return False, "could not refetch coin", coin
+        return "wait", "could not refetch coin", coin
 
-    prev_usd = float(prev.get("usd_market_cap") or 0)
+    first_usd = float(first_look.get("usd_market_cap") or 0)
     now_usd = float(fresh.get("usd_market_cap") or 0)
     ath = float(fresh.get("ath_market_cap") or now_usd)
-    prev_replies = int(prev.get("reply_count") or 0)
+    first_replies = int(first_look.get("reply_count") or 0)
     now_replies = int(fresh.get("reply_count") or 0)
 
     if ath > 5_000 and now_usd < 0.4 * ath:
-        return False, f"dumped after first look (${now_usd:,.0f} vs ATH ${ath:,.0f})", fresh
-    if prev_usd > 3_000 and now_usd < 0.6 * prev_usd:
-        return False, f"MC rolled over ${prev_usd:,.0f} → ${now_usd:,.0f}", fresh
+        return "drop", f"dumped after first look (${now_usd:,.0f} vs ATH ${ath:,.0f})", fresh
+    if first_usd > 3_000 and now_usd < 0.6 * first_usd:
+        return "drop", f"MC rolled over ${first_usd:,.0f} → ${now_usd:,.0f}", fresh
 
     expanding = False
     reasons = []
-    if now_replies > prev_replies:
+    if now_replies > first_replies:
         expanding = True
-        reasons.append(f"replies {prev_replies}→{now_replies}")
-    if prev_usd > 0 and now_usd >= prev_usd * 1.20:
+        reasons.append(f"replies {first_replies}→{now_replies}")
+    if first_usd > 0 and now_usd >= first_usd * 1.20:
         expanding = True
-        reasons.append(f"MC ${prev_usd:,.0f}→${now_usd:,.0f}")
-    if fresh.get("complete") and not prev.get("complete"):
+        reasons.append(f"MC ${first_usd:,.0f}→${now_usd:,.0f}")
+    if fresh.get("complete") and not first_look.get("complete"):
         expanding = True
         reasons.append("graduated during wait")
-    if prev.get("is_currently_live") and not fresh.get("is_currently_live") and not expanding:
-        return False, "livestream died and book did not expand", fresh
+    if first_look.get("is_currently_live") and not fresh.get("is_currently_live") and not expanding:
+        return "drop", "livestream died and book did not expand", fresh
 
     farm = extract_farm_reason(fresh)
     if farm:
-        return False, farm, fresh
+        return "drop", farm, fresh
 
     if not expanding:
-        return False, "attention did not expand after wait", fresh
-    return True, ", ".join(reasons), fresh
+        return "wait", f"still ${now_usd:,.0f} vs first ${first_usd:,.0f}", fresh
+    return "post", ", ".join(reasons), fresh

@@ -10,7 +10,14 @@ from . import config, health, paper
 from .attention import Attention
 from .engine import Verdict, confirm_expansion, evaluate_new
 from .httputil import client
-from .pump import active_coins, age_seconds, fetch_coin, latest_coins, live_coins
+from .pump import (
+    active_coins,
+    age_seconds,
+    fetch_coin,
+    graduated_coins,
+    latest_coins,
+    live_coins,
+)
 from .state import State
 from .telegram import (
     boot_message,
@@ -36,10 +43,13 @@ log = logging.getLogger("runner")
 @dataclass
 class Pending:
     coin: dict
+    first_look: dict
+    first_look_at: float
     ready_at: float
-    story_title: str
+    story: object
     match_score: int
-    verdict_key: str
+    structure: object
+    path: str
 
 
 async def run() -> None:
@@ -62,15 +72,17 @@ async def run() -> None:
         health.STATUS["paper_equity"] = round(paper.snapshot(state)["equity"], 4)
     attention = Attention()
     pending: dict[str, Pending] = {}
+    skip_logged: set[str] = set()
     last_attention = 0.0
     last_leaderboard = time.time()
     last_paper_report = time.time()
+    last_feed_log = 0.0
 
     health.STATUS["ok"] = True
     health.start(config.PORT)
 
     async with client() as http:
-        await boot_message(http)
+        await boot_message(http, signals_today=state.signals_today())
         try:
             await attention.refresh(http)
             last_attention = time.time()
@@ -95,9 +107,31 @@ async def run() -> None:
 
                 fresh = await latest_coins(http, limit=40)
                 streaming = await live_coins(http, limit=20)
-                trading = await active_coins(http, limit=30)
+                trading = await active_coins(http, limit=80)
+                graduates = await graduated_coins(http, limit=25)
+                health.STATUS["feeds"] = {
+                    "latest": len(fresh),
+                    "live": len(streaming),
+                    "last_trade": len(trading),
+                    "graduated": len(graduates),
+                }
+                health.STATUS["quota"] = state.signals_today()
+                health.STATUS["watches"] = len(pending)
+                if time.time() - last_feed_log >= 60:
+                    log.info(
+                        "feeds latest=%s live=%s last_trade=%s graduated=%s "
+                        "watches=%s quota=%s/%s",
+                        len(fresh),
+                        len(streaming),
+                        len(trading),
+                        len(graduates),
+                        len(pending),
+                        state.signals_today(),
+                        config.MAX_SIGNALS_PER_DAY,
+                    )
+                    last_feed_log = time.time()
                 seen_this_loop: set[str] = set()
-                for coin in fresh + streaming + trading:
+                for coin in fresh + streaming + trading + graduates:
                     mint = coin.get("mint")
                     if not mint or mint in seen_this_loop:
                         continue
@@ -115,14 +149,40 @@ async def run() -> None:
                             continue
 
                     verdict = await evaluate_new(http, attention, state, coin)
+                    usd = float(coin.get("usd_market_cap") or 0)
+                    age = age_seconds(coin, time.time())
+                    notable = usd >= config.MIN_TAPE_MC and age <= config.MAX_ACTIVE_AGE_SEC
                     if verdict.failed_gate == "first-mover":
                         log.info("Skip %s first-mover: %s", coin.get("symbol"), verdict.fail_reason)
                         continue
                     if verdict.failed_gate == "farm":
-                        if is_new:
-                            log.info("Skip %s farm: %s", coin.get("symbol"), verdict.fail_reason)
+                        if is_new or notable:
+                            _log_skip_once(
+                                skip_logged,
+                                mint,
+                                coin.get("symbol"),
+                                "farm",
+                                verdict.fail_reason,
+                            )
                         continue
-                    if verdict.failed_gate in {"attention", "age", "quota", "late", "dumped"}:
+                    if verdict.failed_gate == "quota":
+                        _log_skip_once(
+                            skip_logged,
+                            "quota",
+                            coin.get("symbol"),
+                            "quota",
+                            verdict.fail_reason,
+                        )
+                        continue
+                    if verdict.failed_gate in {"attention", "age", "late", "dumped"}:
+                        if notable:
+                            _log_skip_once(
+                                skip_logged,
+                                mint,
+                                coin.get("symbol"),
+                                verdict.failed_gate,
+                                verdict.fail_reason,
+                            )
                         continue
                     if verdict.failed_gate == "structure":
                         log.info("Skip %s structure: %s", coin.get("symbol"), verdict.fail_reason)
@@ -132,37 +192,52 @@ async def run() -> None:
 
                 due = [m for m, p in pending.items() if time.time() >= p.ready_at]
                 for mint in due:
-                    item = pending.pop(mint)
-                    ok, why, fresh = await confirm_expansion(http, item.coin, item.coin)
-                    if not ok:
+                    item = pending[mint]
+                    status, why, fresh_coin = await confirm_expansion(
+                        http, item.coin, item.first_look
+                    )
+                    if status == "wait":
+                        held = time.time() - item.first_look_at
+                        if held >= config.EXPANSION_HOLD_SEC:
+                            pending.pop(mint, None)
+                            log.info(
+                                "Drop %s expansion: no +20%% in %.0fm (%s)",
+                                item.coin.get("symbol"),
+                                held / 60,
+                                why,
+                            )
+                            continue
+                        item.coin = fresh_coin
+                        item.ready_at = time.time() + config.EXPANSION_RECHECK_SEC
+                        continue
+                    pending.pop(mint, None)
+                    if status != "post":
                         log.info("Drop %s expansion: %s", item.coin.get("symbol"), why)
                         continue
                     v = Verdict(
                         post=True,
                         mint=mint,
-                        coin=fresh,
-                        story=item.coin.get("_story"),
+                        coin=fresh_coin,
+                        story=item.story,
                         match_score=item.match_score,
-                        structure=item.coin.get("_structure"),
-                        path=item.coin.get("_path") or "",
+                        structure=item.structure,
+                        path=item.path or "",
                     )
                     text = format_signal(v, why)
                     sent = await send(http, text, preview=True)
                     if sent:
-                        story_title = ""
-                        if item.coin.get("_story") is not None:
-                            story_title = getattr(item.coin["_story"], "title", "") or ""
-                        state.mark_posted(fresh, story_title)
+                        story_title = getattr(item.story, "title", "") or ""
+                        state.mark_posted(fresh_coin, story_title)
                         health.STATUS["posted"] = len(state.list_posted())
-                        log.info("POSTED %s — %s", fresh.get("symbol"), why)
+                        log.info("POSTED %s — %s", fresh_coin.get("symbol"), why)
                         if config.PAPER_ENABLED:
-                            fill = paper.try_open(state, fresh, item.coin.get("_path") or "")
+                            fill = paper.try_open(state, fresh_coin, item.path or "")
                             if fill:
                                 snap = paper.snapshot(state)
                                 health.STATUS["paper_equity"] = round(snap["equity"], 4)
                                 await send(http, format_paper_fill(fill, snap), preview=True)
                     else:
-                        log.error("Failed to post %s", fresh.get("symbol"))
+                        log.error("Failed to post %s", fresh_coin.get("symbol"))
 
                 if config.PAPER_ENABLED:
                     await _manage_paper(http, state)
@@ -183,27 +258,37 @@ async def run() -> None:
             await asyncio.sleep(max(1.0, config.PUMP_POLL_SEC - elapsed))
 
 
+def _log_skip_once(
+    seen: set[str], mint: str, symbol: object, gate: str, reason: str
+) -> None:
+    key = f"{gate}:{mint}"
+    if key in seen:
+        return
+    seen.add(key)
+    log.info("Skip %s %s: %s", symbol, gate, reason)
+
+
 def _queue_watch(pending: dict[str, Pending], coin: dict, verdict: Verdict) -> None:
     if coin["mint"] in pending:
         return
     story = verdict.story
+    now = time.time()
     pending[coin["mint"]] = Pending(
         coin=coin,
-        ready_at=time.time() + config.EXPANSION_WAIT_SEC,
-        story_title=(story.title if story else ""),
+        first_look=dict(coin),
+        first_look_at=now,
+        ready_at=now + config.EXPANSION_WAIT_SEC,
+        story=story,
         match_score=verdict.match_score,
-        verdict_key=coin["mint"],
+        structure=verdict.structure,
+        path=verdict.path or "",
     )
-    coin["_story"] = story
-    coin["_match"] = verdict.match_score
-    coin["_structure"] = verdict.structure
-    coin["_path"] = verdict.path
     log.info(
-        "Watching %s ($%s) path=%s match=%s — %s",
+        "Watching %s ($%s) path=%s first=$%s — %s",
         coin.get("symbol"),
-        coin.get("name"),
-        verdict.path or "news",
-        verdict.match_score,
+        f"{float(coin.get('usd_market_cap') or 0):,.0f}",
+        verdict.path or "tape",
+        f"{float(coin.get('usd_market_cap') or 0):,.0f}",
         (story.title[:80] if story else ""),
     )
 

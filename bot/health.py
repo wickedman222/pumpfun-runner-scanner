@@ -15,6 +15,9 @@ STATUS = {
     "attention": 0,
     "last_error": "",
     "paper_equity": 0,
+    "quota": 0,
+    "watches": 0,
+    "feeds": {},
 }
 
 

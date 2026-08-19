@@ -79,6 +79,9 @@ SOLANA_RPC_URL = _env(
 PUMP_POLL_SEC = _int("PUMP_POLL_SEC", 12)
 ATTENTION_POLL_SEC = _int("ATTENTION_POLL_SEC", 120)
 EXPANSION_WAIT_SEC = _int("EXPANSION_WAIT_SEC", 180)
+# Keep the watch after the first check. FISHBONE pulled back for ~8m then ran.
+EXPANSION_HOLD_SEC = _int("EXPANSION_HOLD_SEC", 30 * 60)
+EXPANSION_RECHECK_SEC = _int("EXPANSION_RECHECK_SEC", 30)
 MAX_TOKEN_AGE_SEC = _int("MAX_TOKEN_AGE_SEC", 20 * 60)
 MAX_LIVE_AGE_SEC = _int("MAX_LIVE_AGE_SEC", 6 * 3600)
 # Organic homepage books (boost=NONE) often print 1–6h after launch, not in 20m.

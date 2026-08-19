@@ -9,9 +9,13 @@ import httpx
 log = logging.getLogger("runner")
 
 HEADERS = {
-    "User-Agent": "pumpfun-runner-scanner/1.0 (+github.com/wickedman222)",
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+    ),
     "Accept": "application/json, application/rss+xml, text/xml, */*",
     "Origin": "https://pump.fun",
+    "Referer": "https://pump.fun/",
 }
 
 

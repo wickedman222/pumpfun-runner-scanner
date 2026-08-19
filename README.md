@@ -16,7 +16,7 @@ Every gate must pass. Real runners are rare — **at most 3 calls/day**.
 
 1. **Headline already in the window** — the mint maps to a news/reddit story we already have. We do not Google/Wiki the ticker to invent a story.
 2. **Real live crowd** — 15+ in the room and the book already has some meat ($8k+).
-3. **First-mover tape** — first mint of that ticker, book already ≥ ~$15k, then +20% / replies / graduate. BOOST is allowed.
+3. **First-mover tape** — first mint of that ticker, book already ≥ ~$15k, then +20% from that first print / replies / graduate. The watch stays up to 30 minutes so a dip after the first look does not kill a later leg. BOOST is allowed. We also poll recently graduated coins — those leave the new-launch feed in about a minute.
 
 Never:
 

@@ -115,6 +115,25 @@ async def _engine_paths() -> None:
     v = await run(painted)
     assert v.failed_gate == "farm", v.fail_reason
 
+    from bot.engine import confirm_expansion
+
+    first = {**pants_coin, "usd_market_cap": 106_000, "complete": True, "reply_count": 0}
+
+    async def exp(fresh):
+        with patch("bot.engine.fetch_coin", new=AsyncMock(return_value=fresh)):
+            return await confirm_expansion(None, first, first)
+
+    # Pullback that is not a dump — keep watching (FISHBONE 12:07→12:10).
+    status, why, _ = await exp({**first, "usd_market_cap": 93_000, "ath_market_cap": 147_000})
+    assert status == "wait", (status, why)
+
+    # Later leg vs first print, not vs the local top.
+    status, why, _ = await exp({**first, "usd_market_cap": 196_000, "ath_market_cap": 210_000})
+    assert status == "post", (status, why)
+
+    status, why, _ = await exp({**first, "usd_market_cap": 40_000, "ath_market_cap": 147_000})
+    assert status == "drop", (status, why)
+
 
 import asyncio
 

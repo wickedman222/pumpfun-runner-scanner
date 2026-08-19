@@ -247,11 +247,13 @@ def mark_sol(pos: dict) -> float:
     return qty * (last / entry)
 
 
-async def boot_message(http: httpx.AsyncClient) -> None:
+async def boot_message(http: httpx.AsyncClient, signals_today: int = 0) -> None:
     text = (
         "<b>Pump.fun runner scanner online</b>\n"
         "Calls: live crowd, a headline already in the window, or first-mover tape.\n"
         "The ticker spelling is not a signal. Mayhem / cashback / copy-farms stay out.\n"
+        f"Quota {signals_today}/{config.MAX_SIGNALS_PER_DAY} today · "
+        f"watch holds {config.EXPANSION_HOLD_SEC // 60}m from first print.\n"
         f"Leaderboard every {config.LEADERBOARD_SEC // 3600}h · paper balance every {config.PAPER_REPORT_SEC // 3600}h"
     )
     if config.PAPER_ENABLED:
