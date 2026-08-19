@@ -126,6 +126,16 @@ COMMON_SUBJECTS = {
 }
 
 
+_FILLER = {"coin", "token", "the", "official", "fun", "sol", "on"}
+
+FAMOUS_BRANDS = {
+    "nasa", "amazon", "walmart", "apple", "aapl", "google", "tesla",
+    "pokemon", "starbucks", "microsoft", "nike", "gta", "nintendo",
+    "facebook", "instagram", "tiktok", "openai", "nvidia", "intel",
+    "samsung", "sony", "marijuana",
+}
+
+
 def is_common_subject(symbol: str, name: str) -> bool:
     """Kepler / Hope / Room match Wikipedia. That is not a runner story."""
     chunks = []
@@ -134,7 +144,35 @@ def is_common_subject(symbol: str, name: str) -> bool:
         if raw:
             chunks.append(raw.replace(" ", ""))
             chunks.extend(raw.split())
-    return any(c in COMMON_SUBJECTS or c in WEAK_WORDS for c in chunks if c)
+    return any(
+        c in COMMON_SUBJECTS or c in WEAK_WORDS
+        for c in chunks
+        if c and c not in _FILLER
+    )
+
+
+def is_meme_name(symbol: str, name: str) -> bool:
+    """dogwifpants / Jimothy The Raccoon — the name *is* the meme.
+
+    PANTS (Ftate…) is this class: BOOST, no socials, no live, but a real
+    smashed joke name and a traded book. USWS/NASA/Hope are not.
+    """
+    if is_fake_official(symbol, name) or is_generic_ticker(symbol, name):
+        return False
+    if is_common_subject(symbol, name):
+        return False
+    n = (name or "").strip()
+    s = (symbol or "").strip().lstrip("$")
+    compact = re.sub(r"[^a-z0-9]", "", n.lower())
+    if compact in FAMOUS_BRANDS or s.lower() in FAMOUS_BRANDS:
+        return False
+    if "wif" in compact and len(compact) >= 8:
+        return True
+    if " " in n and len(n) >= 8:
+        return True
+    if len(compact) >= 9:
+        return True
+    return False
 
 
 def is_invented_token(text: str) -> bool:
@@ -245,7 +283,9 @@ def extract_farm_reason(coin: dict) -> str:
     mayhem = str(coin.get("mayhem_state") or "").upper()
     if mayhem and mayhem not in {"", "NONE", "NULL", "FALSE", "0", "OFF"}:
         return f"mayhem painted book ({mayhem})"
-    if _boost_on(coin) and not has_character_identity(coin):
+    if _boost_on(coin) and not has_character_identity(coin) and not is_meme_name(
+        coin.get("symbol") or "", coin.get("name") or ""
+    ):
         usd = float(coin.get("usd_market_cap") or 0)
         ath = float(coin.get("ath_market_cap") or usd or 0)
         if ath > 0 and usd >= 0.95 * ath and usd >= 20_000:

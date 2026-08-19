@@ -14,8 +14,9 @@ Repo: [github.com/wickedman222/pumpfun-runner-scanner](https://github.com/wicked
 
 Every gate must pass. Real runners are rare — **at most 3 calls/day**.
 
-1. **Rare culture hit** — invented / unique name that *is* the outside story (ESTRIPER, Jimothy, SHOBON). Kepler / Hope / Room matching Wikipedia does not count.
-2. **Real live crowd** — 15+ in the room and the book already has some meat ($8k+). Five people on a $2k stream does not count.
+1. **Rare culture hit** — invented / unique name that *is* the outside story (ESTRIPER, Jimothy). Kepler / Hope / Room matching Wikipedia does not count.
+2. **Real live crowd** — 15+ in the room and the book already has some meat ($8k+).
+3. **Meme name** — smashed/phrase joke name is the trade (dogwifpants). BOOST is allowed here. USWS/NASA/Hope are not.
 
 BOOST is allowed only when that identity is real. Website-only “character” names are not calls.
 

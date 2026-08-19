@@ -15,6 +15,7 @@ from .attention import (
     is_common_subject,
     is_distinctive_name,
     is_generic_ticker,
+    is_meme_name,
     score_match,
     search_query_for,
 )
@@ -151,9 +152,19 @@ async def evaluate_new(
             source="live",
             seen_at=time.time(),
         )
+    elif is_meme_name(coin.get("symbol") or "", coin.get("name") or ""):
+        path = "meme"
+        match_score = 80
+        who = coin.get("name") or coin.get("symbol")
+        story = Story(
+            title=f"Meme first-mover: {who}",
+            url=coin.get("url") or "",
+            source="meme",
+            seen_at=time.time(),
+        )
     else:
         v.failed_gate = "attention"
-        v.fail_reason = "no rare culture hit / real live crowd"
+        v.fail_reason = "no rare culture / live crowd / meme-name"
         return v
 
     structure = await inspect(http, coin)
