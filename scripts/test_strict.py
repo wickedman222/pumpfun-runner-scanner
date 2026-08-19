@@ -138,4 +138,22 @@ async def _engine_paths() -> None:
 import asyncio
 
 asyncio.run(_engine_paths())
+
+# Old posted rows must not fill today's 3-call cap.
+import os
+import tempfile
+
+from bot import config as cfg
+from bot.state import State
+
+cfg.SIGNAL_BOOK_ID = "tape-1"
+tmp = tempfile.mkdtemp()
+st = State(os.path.join(tmp, "quota.db"))
+st.mark_posted({"mint": "old1", "symbol": "OLD", "usd_market_cap": 10_000}, "legacy")
+with st._conn() as con:
+    con.execute("UPDATE posted SET book_id = 'legacy' WHERE mint = 'old1'")
+assert st.signals_today() == 0, st.signals_today()
+st.mark_posted({"mint": "new1", "symbol": "NEW", "usd_market_cap": 20_000}, "tape")
+assert st.signals_today() == 1, st.signals_today()
+
 print("strict buy rules ok")

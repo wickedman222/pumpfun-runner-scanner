@@ -92,6 +92,9 @@ MIN_LIVE_MC = _float("MIN_LIVE_MC", 8_000)
 MIN_TAPE_MC = _float("MIN_TAPE_MC", 15_000)
 # Real runners are rare. 3 calls/day is already a lot.
 MAX_SIGNALS_PER_DAY = _int("MAX_SIGNALS_PER_DAY", 3)
+# Only posts stamped with this id count toward the daily cap.
+# Bump when the strat changes so leftover rows from an old loop do not sit us out.
+SIGNAL_BOOK_ID = _env("SIGNAL_BOOK_ID", "tape-1")
 MIN_MATCH_SCORE = _int("MIN_MATCH_SCORE", 100)
 LEADERBOARD_SEC = _int("LEADERBOARD_SEC", 6 * 3600)
 LEADERBOARD_SIZE = _int("LEADERBOARD_SIZE", 15)

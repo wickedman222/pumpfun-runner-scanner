@@ -105,6 +105,9 @@ class State:
             paper_cols = {row[1] for row in con.execute("PRAGMA table_info(paper_wallet)")}
             if paper_cols and "book_id" not in paper_cols:
                 con.execute("ALTER TABLE paper_wallet ADD COLUMN book_id TEXT")
+            posted_cols = {row[1] for row in con.execute("PRAGMA table_info(posted)")}
+            if "book_id" not in posted_cols:
+                con.execute("ALTER TABLE posted ADD COLUMN book_id TEXT")
 
     @contextmanager
     def _conn(self):
@@ -189,8 +192,8 @@ class State:
                 """
                 INSERT OR REPLACE INTO posted(
                     mint, posted_at, symbol, name, url, story,
-                    entry_mc, ath_mc, last_mc, last_checked
-                ) VALUES (?,?,?,?,?,?,?,?,?,?)
+                    entry_mc, ath_mc, last_mc, last_checked, book_id
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 (
                     coin.get("mint") or "",
@@ -203,6 +206,7 @@ class State:
                     max(ath, entry),
                     entry,
                     now,
+                    config.SIGNAL_BOOK_ID,
                 ),
             )
 
@@ -228,8 +232,11 @@ class State:
         day_ago = int(time.time()) - 86400
         with self._conn() as con:
             row = con.execute(
-                "SELECT COUNT(*) AS n FROM posted WHERE posted_at >= ?",
-                (day_ago,),
+                """
+                SELECT COUNT(*) AS n FROM posted
+                WHERE posted_at >= ? AND book_id = ?
+                """,
+                (day_ago, config.SIGNAL_BOOK_ID),
             ).fetchone()
         return int(row["n"] if row else 0)
 
