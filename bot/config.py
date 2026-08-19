@@ -89,7 +89,12 @@ MAX_ACTIVE_AGE_SEC = _int("MAX_ACTIVE_AGE_SEC", 6 * 3600)
 MIN_LIVE_PARTICIPANTS = _int("MIN_LIVE_PARTICIPANTS", 15)
 MIN_LIVE_MC = _float("MIN_LIVE_MC", 8_000)
 # Tape path: a real book, not a $500 tick. Name is not a filter.
-MIN_TAPE_MC = _float("MIN_TAPE_MC", 15_000)
+# Backtest arm band: first print $8k–$200k, then +20% or graduate.
+MIN_ARM_MC = _float("MIN_ARM_MC", 8_000)
+MIN_TAPE_MC = _float("MIN_TAPE_MC", MIN_ARM_MC)
+GRADUATE_CONFIRM_MC = _float("GRADUATE_CONFIRM_MC", 60_000)
+EXPANSION_MULT = _float("EXPANSION_MULT", 1.20)
+TAPE_REFRESH_LIMIT = _int("TAPE_REFRESH_LIMIT", 50)
 # Real runners are rare. 3 calls/day is already a lot.
 MAX_SIGNALS_PER_DAY = _int("MAX_SIGNALS_PER_DAY", 3)
 # Only posts stamped with this id count toward the daily cap.

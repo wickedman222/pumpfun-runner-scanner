@@ -4,15 +4,12 @@ import asyncio
 import logging
 import sys
 import time
-from dataclasses import dataclass
-
 from . import config, health, paper
 from .attention import Attention
-from .engine import Verdict, confirm_expansion, evaluate_new
+from .engine import evaluate_new
 from .httputil import client
 from .pump import (
     active_coins,
-    age_seconds,
     fetch_coin,
     graduated_coins,
     latest_coins,
@@ -40,18 +37,6 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 log = logging.getLogger("runner")
 
 
-@dataclass
-class Pending:
-    coin: dict
-    first_look: dict
-    first_look_at: float
-    ready_at: float
-    story: object
-    match_score: int
-    structure: object
-    path: str
-
-
 async def run() -> None:
     config.require_telegram()
     state = State()
@@ -71,7 +56,6 @@ async def run() -> None:
             )
         health.STATUS["paper_equity"] = round(paper.snapshot(state)["equity"], 4)
     attention = Attention()
-    pending: dict[str, Pending] = {}
     skip_logged: set[str] = set()
     last_attention = 0.0
     last_leaderboard = time.time()
@@ -91,10 +75,11 @@ async def run() -> None:
             log.warning("Initial attention refresh failed: %s", exc)
 
         log.info(
-            "Scanner loop started. poll=%ss wait=%ss no daily cap · board every %sh",
+            "Scanner loop started. poll=%ss track every launch · buy = $%.0f–$%.0fk then +%.0f%% or graduate",
             config.PUMP_POLL_SEC,
-            config.EXPANSION_WAIT_SEC,
-            config.LEADERBOARD_SEC // 3600,
+            config.MIN_ARM_MC,
+            config.MAX_FIRST_LOOK_MC / 1000,
+            (config.EXPANSION_MULT - 1) * 100,
         )
 
         while True:
@@ -105,33 +90,39 @@ async def run() -> None:
                     last_attention = time.time()
                     health.STATUS["attention"] = len(attention.stories)
 
-                fresh = await latest_coins(http, limit=40)
+                fresh = await latest_coins(http, limit=50)
                 streaming = await live_coins(http, limit=20)
                 trading = await active_coins(http, limit=80)
                 graduates = await graduated_coins(http, limit=25)
+                followed = await _refresh_tracked(http, state)
+                stats = state.tape_stats()
                 health.STATUS["feeds"] = {
                     "latest": len(fresh),
                     "live": len(streaming),
                     "last_trade": len(trading),
                     "graduated": len(graduates),
+                    "followed": len(followed),
                 }
                 health.STATUS["quota"] = state.signals_today()
-                health.STATUS["watches"] = len(pending)
+                health.STATUS["tape"] = stats
                 if time.time() - last_feed_log >= 60:
                     log.info(
-                        "feeds latest=%s live=%s last_trade=%s graduated=%s "
-                        "watches=%s quota=%s/%s",
+                        "feeds latest=%s live=%s last_trade=%s graduated=%s follow=%s "
+                        "tape young=%s armed=%s watching=%s quota=%s/%s",
                         len(fresh),
                         len(streaming),
                         len(trading),
                         len(graduates),
-                        len(pending),
+                        len(followed),
+                        stats.get("young"),
+                        stats.get("armed"),
+                        stats.get("watching"),
                         state.signals_today(),
                         config.MAX_SIGNALS_PER_DAY,
                     )
                     last_feed_log = time.time()
                 seen_this_loop: set[str] = set()
-                for coin in fresh + streaming + trading + graduates:
+                for coin in fresh + streaming + trading + graduates + followed:
                     mint = coin.get("mint")
                     if not mint or mint in seen_this_loop:
                         continue
@@ -139,105 +130,34 @@ async def run() -> None:
                     is_new = state.mark_seen(coin)
                     if is_new:
                         health.STATUS["seen"] = health.STATUS.get("seen", 0) + 1
-                    if state.already_posted(mint) or mint in pending:
+                    if state.already_posted(mint):
+                        state.upsert_tape(coin)
                         continue
-                    # Birth-shot is not enough: homepage runners often print 1–6h later.
-                    if not is_new and not coin.get("is_currently_live"):
-                        age = age_seconds(coin, time.time())
-                        usd = float(coin.get("usd_market_cap") or 0)
-                        if age > config.MAX_ACTIVE_AGE_SEC or usd > config.MAX_FIRST_LOOK_MC:
-                            continue
 
                     verdict = await evaluate_new(http, attention, state, coin)
                     usd = float(coin.get("usd_market_cap") or 0)
-                    age = age_seconds(coin, time.time())
-                    notable = usd >= config.MIN_TAPE_MC and age <= config.MAX_ACTIVE_AGE_SEC
-                    if verdict.failed_gate == "first-mover":
-                        log.info("Skip %s first-mover: %s", coin.get("symbol"), verdict.fail_reason)
+                    notable = usd >= config.MIN_ARM_MC
+                    if verdict.post:
+                        await _emit_buy(http, state, verdict)
                         continue
-                    if verdict.failed_gate == "farm":
-                        if is_new or notable:
-                            _log_skip_once(
-                                skip_logged,
-                                mint,
-                                coin.get("symbol"),
-                                "farm",
-                                verdict.fail_reason,
-                            )
-                        continue
-                    if verdict.failed_gate == "quota":
-                        _log_skip_once(
-                            skip_logged,
-                            "quota",
-                            coin.get("symbol"),
-                            "quota",
-                            verdict.fail_reason,
-                        )
-                        continue
-                    if verdict.failed_gate in {"attention", "age", "late", "dumped"}:
-                        if notable:
-                            _log_skip_once(
-                                skip_logged,
-                                mint,
-                                coin.get("symbol"),
-                                verdict.failed_gate,
-                                verdict.fail_reason,
-                            )
+                    if verdict.failed_gate == "watch":
+                        if verdict.story and str(verdict.story.title).startswith("Armed"):
+                            key = f"arm:{mint}"
+                            if key not in skip_logged:
+                                skip_logged.add(key)
+                                log.info("Armed %s %s", coin.get("symbol"), verdict.fail_reason)
                         continue
                     if verdict.failed_gate == "structure":
                         log.info("Skip %s structure: %s", coin.get("symbol"), verdict.fail_reason)
                         continue
-                    if verdict.failed_gate == "wait-expansion":
-                        _queue_watch(pending, coin, verdict)
-
-                due = [m for m, p in pending.items() if time.time() >= p.ready_at]
-                for mint in due:
-                    item = pending[mint]
-                    status, why, fresh_coin = await confirm_expansion(
-                        http, item.coin, item.first_look
-                    )
-                    if status == "wait":
-                        held = time.time() - item.first_look_at
-                        if held >= config.EXPANSION_HOLD_SEC:
-                            pending.pop(mint, None)
-                            log.info(
-                                "Drop %s expansion: no +20%% in %.0fm (%s)",
-                                item.coin.get("symbol"),
-                                held / 60,
-                                why,
-                            )
-                            continue
-                        item.coin = fresh_coin
-                        item.ready_at = time.time() + config.EXPANSION_RECHECK_SEC
-                        continue
-                    pending.pop(mint, None)
-                    if status != "post":
-                        log.info("Drop %s expansion: %s", item.coin.get("symbol"), why)
-                        continue
-                    v = Verdict(
-                        post=True,
-                        mint=mint,
-                        coin=fresh_coin,
-                        story=item.story,
-                        match_score=item.match_score,
-                        structure=item.structure,
-                        path=item.path or "",
-                    )
-                    text = format_signal(v, why)
-                    sent = await send(http, text, preview=True)
-                    if sent:
-                        story_title = getattr(item.story, "title", "") or ""
-                        state.mark_posted(fresh_coin, story_title)
-                        health.STATUS["posted"] = len(state.list_posted())
-                        log.info("POSTED %s — %s", fresh_coin.get("symbol"), why)
-                        if config.PAPER_ENABLED:
-                            fill = paper.try_open(state, fresh_coin, item.path or "")
-                            if fill:
-                                snap = paper.snapshot(state)
-                                health.STATUS["paper_equity"] = round(snap["equity"], 4)
-                                await send(http, format_paper_fill(fill, snap), preview=True)
-                    else:
-                        log.error("Failed to post %s", fresh_coin.get("symbol"))
+                    if notable or verdict.failed_gate == "quota":
+                        _log_skip_once(
+                            skip_logged,
+                            mint if verdict.failed_gate != "quota" else "quota",
+                            coin.get("symbol"),
+                            verdict.failed_gate,
+                            verdict.fail_reason,
+                        )
 
                 if config.PAPER_ENABLED:
                     await _manage_paper(http, state)
@@ -268,29 +188,49 @@ def _log_skip_once(
     log.info("Skip %s %s: %s", symbol, gate, reason)
 
 
-def _queue_watch(pending: dict[str, Pending], coin: dict, verdict: Verdict) -> None:
-    if coin["mint"] in pending:
+async def _refresh_tracked(http, state: State) -> list[dict]:
+    due = state.tape_due(config.TAPE_REFRESH_LIMIT)
+    if not due:
+        return []
+    sem = asyncio.Semaphore(8)
+
+    async def one(row: dict):
+        async with sem:
+            coin = await fetch_coin(http, row["mint"])
+            if not coin:
+                state.touch_tape(row["mint"])
+                return None
+            return coin
+
+    got = await asyncio.gather(*[one(row) for row in due], return_exceptions=True)
+    out: list[dict] = []
+    for item in got:
+        if isinstance(item, dict) and item.get("mint"):
+            out.append(item)
+    return out
+
+
+async def _emit_buy(http, state: State, verdict) -> None:
+    coin = verdict.coin
+    why = verdict.fail_reason or (verdict.story.title if verdict.story else "tape")
+    text = format_signal(verdict, why)
+    sent = await send(http, text, preview=True)
+    if not sent:
+        log.error("Failed to post %s", coin.get("symbol"))
         return
-    story = verdict.story
-    now = time.time()
-    pending[coin["mint"]] = Pending(
-        coin=coin,
-        first_look=dict(coin),
-        first_look_at=now,
-        ready_at=now + config.EXPANSION_WAIT_SEC,
-        story=story,
-        match_score=verdict.match_score,
-        structure=verdict.structure,
-        path=verdict.path or "",
-    )
-    log.info(
-        "Watching %s ($%s) path=%s first=$%s — %s",
-        coin.get("symbol"),
-        f"{float(coin.get('usd_market_cap') or 0):,.0f}",
-        verdict.path or "tape",
-        f"{float(coin.get('usd_market_cap') or 0):,.0f}",
-        (story.title[:80] if story else ""),
-    )
+    story_title = getattr(verdict.story, "title", "") or ""
+    state.mark_posted(coin, story_title)
+    state.mark_tape(coin.get("mint") or "", "triggered", why)
+    health.STATUS["posted"] = len(state.list_posted())
+    log.info("POSTED %s — %s", coin.get("symbol"), why)
+    if not config.PAPER_ENABLED:
+        return
+    fill = paper.try_open(state, coin, verdict.path or "tape")
+    if not fill:
+        return
+    snap = paper.snapshot(state)
+    health.STATUS["paper_equity"] = round(snap["equity"], 4)
+    await send(http, format_paper_fill(fill, snap), preview=True)
 
 
 async def _send_leaderboard(http, state: State, attention, scanned: int) -> None:

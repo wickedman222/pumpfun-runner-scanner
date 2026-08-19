@@ -2,7 +2,7 @@
 
 Posts **only high-conviction Pump.fun candidates** to Telegram.
 
-It does **not** snipe the board and it does **not** score ticker spelling. A name is not a signal. It posts only when first-mover tape, a live crowd, or a headline already in the window lines up with clean structure. Most days it posts nothing. That is the design.
+Every new mint is scanned and its market-cap tape is stored. Buy-in is the backtested trigger: first print we actually recorded in the **$8k–$200k** band, then **+20% or graduation**, first-mover, not a painted farm, clean structure. A name is not a signal. Most days it still posts little. That is the design.
 
 No real-SOL trading. After a call it opens a **paper** position (starts at 2 SOL) and manages scale-outs / dead exits in Telegram.
 
@@ -14,9 +14,9 @@ Repo: [github.com/wickedman222/pumpfun-runner-scanner](https://github.com/wicked
 
 Every gate must pass. Real runners are rare — **at most 3 calls/day**.
 
-1. **Headline already in the window** — the mint maps to a news/reddit story we already have. We do not Google/Wiki the ticker to invent a story.
-2. **Real live crowd** — 15+ in the room and the book already has some meat ($8k+).
-3. **First-mover tape** — first mint of that ticker, book already ≥ ~$15k, then +20% from that first print / replies / graduate. The watch stays up to 30 minutes so a dip after the first look does not kill a later leg. BOOST is allowed. We also poll recently graduated coins — those leave the new-launch feed in about a minute.
+1. **See every launch** — `latest` plus last-trade, graduates, and a refetch of young mints we already stored (so a coin that leaves `latest` at $4k is still followed).
+2. **Arm** on the first print in **$8k–$200k**.
+3. **Buy** when that same mint then does **+20% from our armed print**, or graduates / has a real live crowd. Structure is checked only at buy, not on every birth.
 
 Never:
 

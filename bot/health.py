@@ -18,6 +18,7 @@ STATUS = {
     "quota": 0,
     "watches": 0,
     "feeds": {},
+    "tape": {},
 }
 
 

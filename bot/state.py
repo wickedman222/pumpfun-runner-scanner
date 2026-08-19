@@ -36,6 +36,25 @@ CREATE TABLE IF NOT EXISTS pending (
 );
 CREATE INDEX IF NOT EXISTS idx_seen_created ON seen_mints(created_ts);
 CREATE INDEX IF NOT EXISTS idx_seen_symbol ON seen_mints(symbol);
+CREATE TABLE IF NOT EXISTS tape (
+    mint TEXT PRIMARY KEY,
+    symbol TEXT,
+    name TEXT,
+    creator TEXT,
+    created_ts INTEGER,
+    first_seen_at INTEGER,
+    first_mc REAL,
+    armed_mc REAL,
+    armed_at INTEGER,
+    last_mc REAL,
+    ath_mc REAL,
+    last_seen_at INTEGER,
+    complete INTEGER,
+    status TEXT,
+    skip_reason TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_tape_due ON tape(status, last_seen_at);
+CREATE INDEX IF NOT EXISTS idx_tape_created ON tape(created_ts);
 CREATE TABLE IF NOT EXISTS paper_wallet (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     cash_sol REAL NOT NULL,
@@ -108,6 +127,29 @@ class State:
             posted_cols = {row[1] for row in con.execute("PRAGMA table_info(posted)")}
             if "book_id" not in posted_cols:
                 con.execute("ALTER TABLE posted ADD COLUMN book_id TEXT")
+            con.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS tape (
+                    mint TEXT PRIMARY KEY,
+                    symbol TEXT,
+                    name TEXT,
+                    creator TEXT,
+                    created_ts INTEGER,
+                    first_seen_at INTEGER,
+                    first_mc REAL,
+                    armed_mc REAL,
+                    armed_at INTEGER,
+                    last_mc REAL,
+                    ath_mc REAL,
+                    last_seen_at INTEGER,
+                    complete INTEGER,
+                    status TEXT,
+                    skip_reason TEXT
+                );
+                CREATE INDEX IF NOT EXISTS idx_tape_due ON tape(status, last_seen_at);
+                CREATE INDEX IF NOT EXISTS idx_tape_created ON tape(created_ts);
+                """
+            )
 
     @contextmanager
     def _conn(self):
@@ -177,6 +219,126 @@ class State:
                 (creator,),
             ).fetchone()
         return int(row["n"] if row else 0)
+
+    def upsert_tape(self, coin: dict) -> dict:
+        now = int(time.time())
+        usd = float(coin.get("usd_market_cap") or 0)
+        ath = float(coin.get("ath_market_cap") or usd or 0)
+        created = int(coin.get("created_timestamp") or 0)
+        if created > 10_000_000_000:
+            created //= 1000
+        mint = coin.get("mint") or ""
+        with self._conn() as con:
+            prev = con.execute("SELECT * FROM tape WHERE mint = ?", (mint,)).fetchone()
+            if not prev:
+                con.execute(
+                    """
+                    INSERT INTO tape(
+                        mint, symbol, name, creator, created_ts, first_seen_at,
+                        first_mc, armed_mc, armed_at, last_mc, ath_mc,
+                        last_seen_at, complete, status, skip_reason
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    """,
+                    (
+                        mint,
+                        (coin.get("symbol") or "").upper(),
+                        coin.get("name") or "",
+                        coin.get("creator") or "",
+                        created,
+                        now,
+                        usd,
+                        0.0,
+                        0,
+                        usd,
+                        max(ath, usd),
+                        now,
+                        1 if coin.get("complete") else 0,
+                        "watching",
+                        "",
+                    ),
+                )
+            else:
+                con.execute(
+                    """
+                    UPDATE tape SET
+                        symbol = ?, name = ?, last_mc = ?,
+                        ath_mc = MAX(ath_mc, ?), last_seen_at = ?,
+                        complete = ?
+                    WHERE mint = ?
+                    """,
+                    (
+                        (coin.get("symbol") or "").upper(),
+                        coin.get("name") or "",
+                        usd,
+                        max(ath, usd),
+                        now,
+                        1 if coin.get("complete") else 0,
+                        mint,
+                    ),
+                )
+            row = con.execute("SELECT * FROM tape WHERE mint = ?", (mint,)).fetchone()
+        return dict(row) if row else {}
+
+    def arm_tape(self, mint: str, mc: float) -> None:
+        with self._conn() as con:
+            con.execute(
+                """
+                UPDATE tape SET armed_mc = ?, armed_at = ?, status = 'armed'
+                WHERE mint = ? AND (armed_mc IS NULL OR armed_mc <= 0)
+                """,
+                (mc, int(time.time()), mint),
+            )
+
+    def mark_tape(self, mint: str, status: str, reason: str = "") -> None:
+        with self._conn() as con:
+            con.execute(
+                "UPDATE tape SET status = ?, skip_reason = ? WHERE mint = ?",
+                (status, reason, mint),
+            )
+
+    def touch_tape(self, mint: str) -> None:
+        with self._conn() as con:
+            con.execute(
+                "UPDATE tape SET last_seen_at = ? WHERE mint = ?",
+                (int(time.time()), mint),
+            )
+
+    def tape_due(self, limit: int = 50) -> list[dict]:
+        cutoff = int(time.time()) - config.MAX_ACTIVE_AGE_SEC
+        with self._conn() as con:
+            rows = con.execute(
+                """
+                SELECT * FROM tape
+                WHERE created_ts >= ? AND status IN ('watching', 'armed')
+                ORDER BY CASE status WHEN 'armed' THEN 0 ELSE 1 END,
+                         last_seen_at ASC
+                LIMIT ?
+                """,
+                (cutoff, limit),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def tape_stats(self) -> dict:
+        cutoff = int(time.time()) - config.MAX_ACTIVE_AGE_SEC
+        with self._conn() as con:
+            total = con.execute("SELECT COUNT(*) n FROM tape").fetchone()["n"]
+            young = con.execute(
+                "SELECT COUNT(*) n FROM tape WHERE created_ts >= ?", (cutoff,)
+            ).fetchone()["n"]
+            armed = con.execute(
+                "SELECT COUNT(*) n FROM tape WHERE status = 'armed' AND created_ts >= ?",
+                (cutoff,),
+            ).fetchone()["n"]
+            watching = con.execute(
+                "SELECT COUNT(*) n FROM tape WHERE status = 'watching' AND created_ts >= ?",
+                (cutoff,),
+            ).fetchone()["n"]
+        return {
+            "total": int(total),
+            "young": int(young),
+            "armed": int(armed),
+            "watching": int(watching),
+        }
 
     def already_posted(self, mint: str) -> bool:
         with self._conn() as con:

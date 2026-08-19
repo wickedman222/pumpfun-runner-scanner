@@ -16,13 +16,9 @@ def _esc(text: object) -> str:
 
 
 def _why_token(path: str) -> str:
-    if path == "news":
-        return "first mint that maps to a headline already in the window"
     if path == "live":
         return "live crowd with a real book"
-    if path == "tape":
-        return "first-mover book with real expansion — name is not the reason"
-    return "first-mover book"
+    return "first print we tracked in the $8k–$200k band, then +20% or graduation"
 
 
 async def send(http: httpx.AsyncClient, text: str, preview: bool = False) -> bool:
@@ -99,9 +95,9 @@ def format_signal(v: Verdict, expansion: str) -> str:
         "dev or clustered wallets start selling",
         "holder count stalls while MC pumps",
         "a cleaner original appears",
-        "the story stops spreading outside crypto",
+        "the book dies after entry",
         "",
-        "<i>Not a trade call. Structure + tape snapshot only. Most still die.</i>",
+        "<i>Not a trade call. Tape trigger + structure only. Most still die.</i>",
     ]
     return "\n".join(lines)
 
@@ -250,10 +246,9 @@ def mark_sol(pos: dict) -> float:
 async def boot_message(http: httpx.AsyncClient, signals_today: int = 0) -> None:
     text = (
         "<b>Pump.fun runner scanner online</b>\n"
-        "Calls: live crowd, a headline already in the window, or first-mover tape.\n"
-        "The ticker spelling is not a signal. Mayhem / cashback / copy-farms stay out.\n"
-        f"Quota {signals_today}/{config.MAX_SIGNALS_PER_DAY} today · "
-        f"watch holds {config.EXPANSION_HOLD_SEC // 60}m from first print.\n"
+        "Core: every launch is tracked. Buy = first $8k–$200k print we recorded, then +20% or graduate.\n"
+        "Name is not a signal. Mayhem / cashback / copy-farms stay out.\n"
+        f"Quota {signals_today}/{config.MAX_SIGNALS_PER_DAY} today.\n"
         f"Leaderboard every {config.LEADERBOARD_SEC // 3600}h · paper balance every {config.PAPER_REPORT_SEC // 3600}h"
     )
     if config.PAPER_ENABLED:

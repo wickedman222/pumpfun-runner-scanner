@@ -7,14 +7,11 @@ from dataclasses import dataclass, field
 import httpx
 
 from . import config
-from .attention import (
-    Attention,
-    Story,
-    extract_farm_reason,
-)
-from .pump import age_seconds, fetch_coin
+from .attention import Attention, Story
+from .pump import fetch_coin
 from .state import State
 from .structure import Structure, inspect
+from .tape import decide as tape_decide
 
 log = logging.getLogger("runner")
 
@@ -48,88 +45,51 @@ async def evaluate_new(
     mint = coin["mint"]
     v = Verdict(post=False, mint=mint, coin=coin)
     usd = float(coin.get("usd_market_cap") or 0)
-    ath = float(coin.get("ath_market_cap") or usd)
 
-    if config.MAX_SIGNALS_PER_DAY > 0 and state.signals_today() >= config.MAX_SIGNALS_PER_DAY:
-        v.failed_gate = "quota"
-        v.fail_reason = "daily signal cap reached"
-        return v
-
-    farm = extract_farm_reason(coin)
-    if farm:
-        v.failed_gate = "farm"
-        v.fail_reason = farm
-        return v
-
-    age = age_seconds(coin, time.time())
-    live = bool(coin.get("is_currently_live"))
-    max_age = config.MAX_LIVE_AGE_SEC if live else config.MAX_TOKEN_AGE_SEC
-    # Organic (non-BOOST) books can sit on the homepage for hours before they print.
-    max_age = max(max_age, config.MAX_ACTIVE_AGE_SEC)
-    if age > max_age:
-        v.failed_gate = "age"
-        v.fail_reason = f"too old ({age/60:.0f}m)"
-        return v
-
-    if ath > 8_000 and usd < 0.4 * ath:
-        v.failed_gate = "dumped"
-        v.fail_reason = f"already dumped (${usd:,.0f} vs ATH ${ath:,.0f})"
-        return v
-
+    row = state.upsert_tape(coin)
     created_ts = _created_ts(coin)
-    older = state.older_same_name(coin["symbol"], coin["name"], created_ts)
-    if older and older.get("mint") != mint:
-        v.failed_gate = "first-mover"
-        v.fail_reason = f"older mint already exists: {older['mint'][:8]}…"
-        return v
-
+    older = state.older_same_name(coin.get("symbol") or "", coin.get("name") or "", created_ts)
     copies = state.same_symbol_copies(coin.get("symbol") or "", created_ts)
-    if copies >= config.META_COPY_MIN:
-        v.failed_gate = "farm"
-        v.fail_reason = f"copy farm ({copies} same-ticker launches)"
+    call = tape_decide(coin, row, older=older, copies=copies, now=time.time())
+    v.path = call.path
+    v.fail_reason = call.reason
+    if call.armed_mc:
+        v.extras = [f"armed ${call.armed_mc:,.0f}"]
+
+    if call.action == "skip":
+        gate = "skip"
+        if "farm" in call.reason or "mayhem" in call.reason or "cashback" in call.reason or "copy" in call.reason:
+            gate = "farm"
+        elif call.reason.startswith("too old"):
+            gate = "age"
+        elif "dumped" in call.reason:
+            gate = "dumped"
+        elif "older mint" in call.reason:
+            gate = "first-mover"
+        elif "already $" in call.reason or "chase" in call.reason:
+            gate = "late"
+        v.failed_gate = gate
+        state.mark_tape(mint, "skipped", call.reason)
         return v
 
-    if usd > config.MAX_FIRST_LOOK_MC:
-        v.failed_gate = "late"
-        v.fail_reason = f"already ${usd:,.0f} on first look"
-        return v
-
-    # News only if a headline already exists in the window. Do not search
-    # Wikipedia/Google for the ticker — that is following a name.
-    hits = attention.match_coin(coin["symbol"], coin["name"])
-    path = ""
-    story = None
-    match_score = 0
-    participants = int(coin.get("num_participants") or 0)
-    if hits and hits[0][1] >= config.MIN_MATCH_SCORE:
-        path = "news"
-        story, match_score = hits[0]
-    elif (
-        live
-        and participants >= config.MIN_LIVE_PARTICIPANTS
-        and usd >= config.MIN_LIVE_MC
-    ):
-        path = "live"
-        match_score = 85
-        title = coin.get("livestream_title") or coin.get("name") or coin.get("symbol")
-        story = Story(
-            title=f"Livestream ({participants} in room): {title}",
-            url=coin.get("url") or "",
-            source="live",
-            seen_at=time.time(),
-        )
-    elif usd >= config.MIN_TAPE_MC:
-        path = "tape"
-        match_score = 70
-        story = Story(
-            title=f"First-mover tape · MC ${usd:,.0f}",
+    if call.action == "arm":
+        state.arm_tape(mint, call.armed_mc or usd)
+        v.failed_gate = "watch"
+        v.story = Story(
+            title=f"Armed first print ${call.armed_mc:,.0f}",
             url=coin.get("url") or "",
             source="tape",
             seen_at=time.time(),
         )
-    else:
-        v.failed_gate = "attention"
-        v.fail_reason = "no news map / live crowd / tape book"
+        return v
+
+    if call.action == "watch":
+        v.failed_gate = "watch"
+        return v
+
+    if config.MAX_SIGNALS_PER_DAY > 0 and state.signals_today() >= config.MAX_SIGNALS_PER_DAY:
+        v.failed_gate = "quota"
+        v.fail_reason = "daily signal cap reached"
         return v
 
     structure = await inspect(http, coin)
@@ -139,11 +99,16 @@ async def evaluate_new(
         v.fail_reason = "; ".join(structure.reasons_fail)
         return v
 
-    v.path = path
-    v.story = story
-    v.match_score = match_score
-    v.failed_gate = "wait-expansion"
-    v.fail_reason = "passed screens; waiting for expansion"
+    v.post = True
+    v.path = "tape"
+    v.match_score = 80
+    v.failed_gate = ""
+    v.story = Story(
+        title=f"Tape buy-in · {call.reason}",
+        url=coin.get("url") or "",
+        source="tape",
+        seen_at=time.time(),
+    )
     return v
 
 
