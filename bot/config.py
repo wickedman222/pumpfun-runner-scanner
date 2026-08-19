@@ -95,8 +95,8 @@ MIN_TAPE_MC = _float("MIN_TAPE_MC", MIN_ARM_MC)
 GRADUATE_CONFIRM_MC = _float("GRADUATE_CONFIRM_MC", 60_000)
 EXPANSION_MULT = _float("EXPANSION_MULT", 1.20)
 TAPE_REFRESH_LIMIT = _int("TAPE_REFRESH_LIMIT", 50)
-# Real runners are rare. 3 calls/day is already a lot.
-MAX_SIGNALS_PER_DAY = _int("MAX_SIGNALS_PER_DAY", 3)
+# 0 = no daily trade cap. Runners are rare enough; do not sit them out.
+MAX_SIGNALS_PER_DAY = _int("MAX_SIGNALS_PER_DAY", 0)
 # Only posts stamped with this id count toward the daily cap.
 # Bump when the strat changes so leftover rows from an old loop do not sit us out.
 SIGNAL_BOOK_ID = _env("SIGNAL_BOOK_ID", "tape-1")

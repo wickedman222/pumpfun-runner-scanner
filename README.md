@@ -12,7 +12,7 @@ Repo: [github.com/wickedman222/pumpfun-runner-scanner](https://github.com/wicked
 
 ## What has to be true before a post
 
-Every gate must pass. Real runners are rare — **at most 3 calls/day**.
+Every gate must pass. There is **no daily trade cap** — if several names hit the trigger, we take them (paper still max 2 open at once).
 
 1. **See every launch** — `latest` plus last-trade, graduates, and a refetch of young mints we already stored (so a coin that leaves `latest` at $4k is still followed).
 2. **Arm** on the first print in **$8k–$200k**.

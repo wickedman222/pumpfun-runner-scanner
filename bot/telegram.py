@@ -247,8 +247,7 @@ async def boot_message(http: httpx.AsyncClient, signals_today: int = 0) -> None:
     text = (
         "<b>Pump.fun runner scanner online</b>\n"
         "Core: every launch is tracked. Buy = first $8k–$200k print we recorded, then +20% or graduate.\n"
-        "Name is not a signal. Mayhem / cashback / copy-farms stay out.\n"
-        f"Quota {signals_today}/{config.MAX_SIGNALS_PER_DAY} today.\n"
+        "Name is not a signal. Mayhem / cashback / copy-farms stay out. No daily trade cap.\n"
         f"Leaderboard every {config.LEADERBOARD_SEC // 3600}h · paper balance every {config.PAPER_REPORT_SEC // 3600}h"
     )
     if config.PAPER_ENABLED:

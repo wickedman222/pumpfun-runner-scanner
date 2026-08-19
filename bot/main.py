@@ -108,7 +108,7 @@ async def run() -> None:
                 if time.time() - last_feed_log >= 60:
                     log.info(
                         "feeds latest=%s live=%s last_trade=%s graduated=%s follow=%s "
-                        "tape young=%s armed=%s watching=%s quota=%s/%s",
+                        "tape young=%s armed=%s watching=%s posted_today=%s",
                         len(fresh),
                         len(streaming),
                         len(trading),
@@ -118,7 +118,6 @@ async def run() -> None:
                         stats.get("armed"),
                         stats.get("watching"),
                         state.signals_today(),
-                        config.MAX_SIGNALS_PER_DAY,
                     )
                     last_feed_log = time.time()
                 seen_this_loop: set[str] = set()
