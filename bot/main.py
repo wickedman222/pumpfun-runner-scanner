@@ -40,6 +40,8 @@ log = logging.getLogger("runner")
 async def run() -> None:
     config.require_telegram()
     state = State()
+    paper_reset = False
+    paper_snap = None
     if config.PAPER_ENABLED:
         wallet = state.ensure_paper_wallet(config.PAPER_START_SOL)
         if (wallet.get("book_id") or "") != config.PAPER_BOOK_ID:
@@ -54,7 +56,9 @@ async def run() -> None:
                 config.PAPER_BOOK_ID,
                 reason=f"reset to {config.PAPER_BOOK_ID}",
             )
-        health.STATUS["paper_equity"] = round(paper.snapshot(state)["equity"], 4)
+            paper_reset = True
+        paper_snap = paper.snapshot(state)
+        health.STATUS["paper_equity"] = round(paper_snap["equity"], 4)
     attention = Attention()
     skip_logged: set[str] = set()
     last_attention = 0.0
@@ -66,7 +70,12 @@ async def run() -> None:
     health.start(config.PORT)
 
     async with client() as http:
-        await boot_message(http, signals_today=state.signals_today())
+        await boot_message(
+            http,
+            signals_today=state.signals_today(),
+            snap=paper_snap,
+            reset=paper_reset,
+        )
         try:
             await attention.refresh(http)
             last_attention = time.time()

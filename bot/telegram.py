@@ -243,19 +243,27 @@ def mark_sol(pos: dict) -> float:
     return qty * (last / entry)
 
 
-async def boot_message(http: httpx.AsyncClient, signals_today: int = 0) -> None:
+async def boot_message(
+    http: httpx.AsyncClient,
+    signals_today: int = 0,
+    snap: dict | None = None,
+    reset: bool = False,
+) -> None:
     text = (
         "<b>Pump.fun runner scanner online</b>\n"
         "Core: every launch is tracked. Buy = first $8k–$200k print we recorded, then +20% or graduate.\n"
         "Name is not a signal. Mayhem / cashback / copy-farms stay out. No daily trade cap.\n"
         f"Leaderboard every {config.LEADERBOARD_SEC // 3600}h · paper balance every {config.PAPER_REPORT_SEC // 3600}h"
     )
-    if config.PAPER_ENABLED:
+    if config.PAPER_ENABLED and snap:
+        if reset:
+            text += f"\n\n<b>Paper book was reset to {config.PAPER_START_SOL:.2f} SOL</b> — not real fills."
+        text += "\n\n" + format_paper_book(snap)
+    elif config.PAPER_ENABLED:
         text += (
-            f"\n\n<b>Paper book reset: {config.PAPER_START_SOL:.2f} SOL</b> — no real fills.\n"
-            f"Size {config.PAPER_SIZE_FRAC * 100:.1f}% of equity "
-            f"({config.PAPER_SIZE_MIN:.2f}–{config.PAPER_SIZE_MAX:.2f}), "
-            f"max {config.PAPER_MAX_OPEN} open."
+            f"\n\nPaper on · size {config.PAPER_SIZE_FRAC * 100:.1f}% "
+            f"({config.PAPER_SIZE_MIN:.2f}–{config.PAPER_SIZE_MAX:.2f}) · "
+            f"max {config.PAPER_MAX_OPEN} open. Not a reset."
         )
     ok = await send(http, text)
     if ok:
