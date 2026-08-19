@@ -14,16 +14,7 @@ from .httputil import get_json, get_text
 
 log = logging.getLogger("runner")
 
-GENERIC_TICKERS = {
-    "PEPE", "DOGE", "CAT", "DOG", "MOON", "PUMP", "ELON", "TRUMP", "BIDEN",
-    "WIF", "BONK", "AI", "GPT", "SOL", "BTC", "ETH", "MEME", "COIN", "TOKEN",
-    "BABY", "INU", "SHIB", "FLOKI", "WOJAK", "CHAD", "BASED", "RIZZ", "SIGMA",
-    "GIGA", "PUSSY", "SEX", "PORN", "FUCK", "SHIT", "POOP", "FART", "ASS",
-    "TITS", "DICK", "COCK", "CUM", "NIGGER", "HITLER", "JEW", "GAY", "FAG",
-    "TEST", "NEW", "THE", "THIS", "THAT", "LOL", "OMG", "WTF", "LMAO",
-    "USD", "USDC", "USDT", "PUMPFUN", "LAUNCH", "MOONSHOT", "DEGEN",
-    "CHILL", "GUY", "GIRL", "KING", "QUEEN", "GOD", "DEVIL", "ANGEL",
-}
+# Weak English for news overlap only. Never used to buy or skip a mint.
 
 STOP = {
     "the", "a", "an", "and", "or", "of", "to", "in", "on", "for", "with",
@@ -93,204 +84,17 @@ def is_token_promo(title: str) -> bool:
     return any(bit in t for bit in PROMO_BITS)
 
 
-def is_generic_ticker(symbol: str, name: str) -> bool:
-    sym = (symbol or "").upper().lstrip("$")
-    if not sym or len(sym) < 3:
-        return True
-    if sym in GENERIC_TICKERS:
-        return True
-    name_l = (name or "").strip().lower()
-    if name_l in {"cat", "dog", "pepe", "moon", "coin", "token", "the z coin", "z coin"}:
-        return True
-    if name_l in WEAK_WORDS:
-        return True
-    return False
-
-
-COMMON_SUBJECTS = {
-    "hope", "room", "split", "scope", "vision", "virus", "brain", "golden",
-    "bull", "frog", "cat", "dog", "long", "short", "horse", "awake", "clout",
-    "abyss", "paper", "official", "newbie", "magic", "block", "time", "love",
-    "king", "queen", "moon", "star", "fire", "ice", "dark", "light", "money",
-    "power", "super", "mega", "ultra", "nova", "luna", "orion", "kepler",
-    "newton", "tesla", "casper", "todd", "alex", "max", "leo", "jack", "john",
-    "mike", "tom", "nick", "sam", "ben", "dan", "chris", "david", "james",
-    "alpha", "omega", "delta", "sigma", "gamma", "beta", "liquid", "water",
-    "earth", "wind", "stone", "rock", "gold", "silver", "iron", "steel",
-    "happy", "lucky", "crazy", "funny", "pretty", "little", "big", "black",
-    "white", "green", "red", "blue", "pink", "purple", "change", "changed",
-    "future", "past", "today", "project", "labs", "lab", "protocol", "network",
-    "chain", "swap", "finance", "capital", "trust", "fund", "reserve",
-    "penguin", "striper", "stripe", "anvil", "river", "ocean", "forest",
-    "tiger", "lion", "bear", "wolf", "fish", "bird", "mouse", "rat",
-}
-
-
-_FILLER = {"coin", "token", "the", "official", "fun", "sol", "on"}
-
-FAMOUS_BRANDS = {
-    "nasa", "amazon", "walmart", "apple", "aapl", "google", "tesla",
-    "pokemon", "starbucks", "microsoft", "nike", "gta", "nintendo",
-    "facebook", "instagram", "tiktok", "openai", "nvidia", "intel",
-    "samsung", "sony", "marijuana",
-}
-
-
-def is_common_subject(symbol: str, name: str) -> bool:
-    """Kepler / Hope / Room match Wikipedia. That is not a runner story."""
-    chunks = []
-    for part in (symbol, name):
-        raw = re.sub(r"[^a-z0-9]+", " ", (part or "").lower()).strip()
-        if raw:
-            chunks.append(raw.replace(" ", ""))
-            chunks.extend(raw.split())
-    return any(
-        c in COMMON_SUBJECTS or c in WEAK_WORDS
-        for c in chunks
-        if c and c not in _FILLER
-    )
-
-
-def is_meme_name(symbol: str, name: str) -> bool:
-    """dogwifpants / Jimothy The Raccoon — the name *is* the meme.
-
-    PANTS (Ftate…) is this class: BOOST, no socials, no live, but a real
-    smashed joke name and a traded book. USWS/NASA/Hope are not.
-    """
-    if is_fake_official(symbol, name) or is_generic_ticker(symbol, name):
-        return False
-    if is_common_subject(symbol, name):
-        return False
-    n = (name or "").strip()
-    s = (symbol or "").strip().lstrip("$")
-    compact = re.sub(r"[^a-z0-9]", "", n.lower())
-    if compact in FAMOUS_BRANDS or s.lower() in FAMOUS_BRANDS:
-        return False
-    if "wif" in compact and len(compact) >= 8:
-        return True
-    if " " in n and len(n) >= 8:
-        return True
-    if len(compact) >= 9:
-        return True
-    return False
-
-
-def is_invented_token(text: str) -> bool:
-    t = re.sub(r"[^a-z0-9]", "", (text or "").lower())
-    if len(t) < 7 or t in COMMON_SUBJECTS or t in WEAK_WORDS:
-        return False
-    return True
-
-
-def culture_hit_ok(symbol: str, name: str, story: Story | None, score: int) -> bool:
-    """Only a real outside-crypto object: ESTRIPER / Jimothy / SHOBON — not Kepler."""
-    if score < 100 or story is None or is_common_subject(symbol, name):
-        return False
-    title = (story.title or "").lower()
-    name_l = (name or "").strip().lower()
-    sym = (symbol or "").lower().lstrip("$")
-    if name_l and len(name_l) >= 6 and name_l in title:
-        return True
-    if " " in name_l and name_l in title:
-        return True
-    if is_invented_token(sym) and sym in title:
-        return True
-    return False
-
-
-def is_distinctive_name(symbol: str, name: str) -> bool:
-    """Jimothy / SHOBON / Gorikun — a real word or character, not USWS or $Z."""
-    if is_generic_ticker(symbol, name) or is_fake_official(symbol, name):
-        return False
-    n = (name or "").strip()
-    s = (symbol or "").strip().lstrip("$")
-    if len(n) >= 6:
-        return True
-    if len(s) >= 5 and re.search(r"[AEIOUaeiou]", s):
-        return True
-    return False
-
-
-def search_query_for(coin: dict) -> str:
-    name = (coin.get("name") or "").strip()
-    symbol = (coin.get("symbol") or "").strip()
-    words = extract_words(name)
-    if words and not name.startswith("("):
-        return name
-    return symbol or name
-
-
-def has_character_identity(coin: dict) -> bool:
-    """Real recent runners: a character/culture, live crowd, or both.
-
-    SHOBON = live + 49 people + shobon.xyz
-    Gorikun = distinctive name + site + lore
-    Jimothy = raccoon + IG/YT
-    USWS/EYE = BOOST, no identity, ATH glued to spot
-    """
-    if not is_distinctive_name(coin.get("symbol") or "", coin.get("name") or ""):
-        return False
-    parts = int(coin.get("num_participants") or 0)
-    if coin.get("is_currently_live") and parts >= 5:
-        return True
-    twitter = bool(coin.get("twitter"))
-    website = bool(coin.get("website"))
-    lore = len(coin.get("description") or "") >= 60
-    if website and (twitter or lore):
-        return True
-    if twitter and lore:
-        return True
-    return False
-
-
-FAKE_OFFICIAL_TICKERS = {
-    "USWS", "USWR", "UOTF", "UATF", "WWR", "NTDA", "Z500", "ZTERM",
-    "EYE", "LAYOOO",
-}
-
-FAKE_OFFICIAL_PHRASES = (
-    "united states", "united oil", "united american", "united water",
-    "trust fund", "water supply", "water reserve", "world water",
-    "digital account", "national trump", "federal reserve",
-    "bulls's eye", "bulls eye", "strategic reserve", "treasury fund",
-    "oil trust", "american trust",
-)
-
-
-def is_fake_official(symbol: str, name: str) -> bool:
-    """Manufactured 'US agency / fund / reserve' extract metas. Contract is clean; the play is not."""
-    sym = re.sub(r"[^A-Z0-9]", "", (symbol or "").upper())
-    if sym in FAKE_OFFICIAL_TICKERS:
-        return True
-    blob = f"{symbol or ''} {name or ''}".lower()
-    return any(p in blob for p in FAKE_OFFICIAL_PHRASES)
-
-
-def _boost_on(coin: dict) -> bool:
-    mode = str(coin.get("boost_mode") or "NONE").upper()
-    return mode not in {"", "NONE", "NULL", "FALSE", "0", "OFF"}
-
-
 def extract_farm_reason(coin: dict) -> str:
-    """Skip painted extract books. Do not skip every BOOST coin.
+    """Skip painted program books. The ticker spelling is never a reason.
 
-    USWS/EYE: BOOST, fake-official name, no site, ATH glued to spot.
-    SHOBON/Gorikun: BOOST too, but a real character + site / live crowd.
-    Mayhem stays banned. Empty chat is not a signal either way.
+    Mayhem / cashback paint the tape. Copy-ticker floods are caught in the
+    engine. BOOST by itself is allowed — real books use it too.
     """
-    if is_fake_official(coin.get("symbol") or "", coin.get("name") or ""):
-        return "fake official / fund-reserve meta"
     mayhem = str(coin.get("mayhem_state") or "").upper()
     if mayhem and mayhem not in {"", "NONE", "NULL", "FALSE", "0", "OFF"}:
         return f"mayhem painted book ({mayhem})"
-    if _boost_on(coin) and not has_character_identity(coin) and not is_meme_name(
-        coin.get("symbol") or "", coin.get("name") or ""
-    ):
-        usd = float(coin.get("usd_market_cap") or 0)
-        ath = float(coin.get("ath_market_cap") or usd or 0)
-        if ath > 0 and usd >= 0.95 * ath and usd >= 20_000:
-            return "boost one-way tape (no character/live identity)"
-        return "boost book with no character/live identity"
+    if coin.get("is_cashback_enabled"):
+        return "cashback painted book"
     return ""
 
 
@@ -423,6 +227,4 @@ def score_match(symbol: str, name: str, story: Story) -> int:
     score += 18 * len(rare)
     if phrase:
         score += 20
-    if is_generic_ticker(symbol, name):
-        return 0
     return score

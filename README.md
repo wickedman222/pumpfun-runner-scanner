@@ -2,7 +2,7 @@
 
 Posts **only high-conviction Pump.fun candidates** to Telegram.
 
-It does **not** snipe the board. It starts from exogenous attention (news / reddit), then takes the first clean mint that maps to that story. Most days it posts nothing. That is the design.
+It does **not** snipe the board and it does **not** score ticker spelling. A name is not a signal. It posts only when first-mover tape, a live crowd, or a headline already in the window lines up with clean structure. Most days it posts nothing. That is the design.
 
 No real-SOL trading. After a call it opens a **paper** position (starts at 2 SOL) and manages scale-outs / dead exits in Telegram.
 
@@ -14,24 +14,18 @@ Repo: [github.com/wickedman222/pumpfun-runner-scanner](https://github.com/wicked
 
 Every gate must pass. Real runners are rare — **at most 3 calls/day**.
 
-1. **Rare culture hit** — invented / unique name that *is* the outside story (ESTRIPER, Jimothy). Kepler / Hope / Room matching Wikipedia does not count.
+1. **Headline already in the window** — the mint maps to a news/reddit story we already have. We do not Google/Wiki the ticker to invent a story.
 2. **Real live crowd** — 15+ in the room and the book already has some meat ($8k+).
-3. **Meme name** — smashed/phrase joke name is the trade (dogwifpants). BOOST is allowed here. USWS/NASA/Hope are not.
-
-BOOST is allowed only when that identity is real. Website-only “character” names are not calls.
+3. **First-mover tape** — first mint of that ticker, book already ≥ ~$15k, then +20% / replies / graduate. BOOST is allowed.
 
 Never:
 
-- Fake US fund/reserve names (USWS, EYE, UOTF, WWR, Z500…)
-- BOOST with **no** character, site, or live crowd (painted one-way tape)
-- Mayhem
-- Copy-ticker farms
+- Mayhem or cashback painted books
+- Copy-ticker farms (same ticker flooding — farm mechanic, not the letters)
 - First look already above ~$200k (just-graduated runners are allowed; $1M chases are not)
 - Serial-rug / bundled structure
 
-Empty on-site chat is normal in 2026. The scam tell is the USWS chart (ATH glued to spot, acronym, no identity), not BOOST by itself.
-
-Generic tickers (`PEPE`, `CAT`, `MOON`, …) are ignored on purpose.
+Empty on-site chat is normal in 2026. We do not ban or buy because of how the name is spelled.
 
 ---
 
@@ -59,8 +53,8 @@ On a healthy boot the channel gets:
 
 ```
 Pump.fun runner scanner online
-Attention-first. I only post if it looks like a real runner.
-No daily cap — gates decide.
+Calls: live crowd, a headline already in the window, or first-mover tape.
+The ticker spelling is not a signal.
 ```
 
 Every 6 hours it also posts an **all-time top 15** of calls ranked by ATH multiple (the x from the price when we posted), plus the paper book.
@@ -141,6 +135,6 @@ Not a trade call.
 
 ## Honest expectations
 
-- Graduation ≠ runner. This bot is trying to catch the rare *story-first* names, not every coin that fills the curve.
+- Graduation ≠ runner. The bot is trying to catch first-mover expansion with clean structure, not every coin that fills the curve.
 - Most tokens that pass still die. The edge is selection quality, not a high win rate.
 - Empty days are normal and preferred over spam.

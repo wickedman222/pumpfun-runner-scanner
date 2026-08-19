@@ -85,6 +85,8 @@ MAX_LIVE_AGE_SEC = _int("MAX_LIVE_AGE_SEC", 6 * 3600)
 MAX_ACTIVE_AGE_SEC = _int("MAX_ACTIVE_AGE_SEC", 6 * 3600)
 MIN_LIVE_PARTICIPANTS = _int("MIN_LIVE_PARTICIPANTS", 15)
 MIN_LIVE_MC = _float("MIN_LIVE_MC", 8_000)
+# Tape path: a real book, not a $500 tick. Name is not a filter.
+MIN_TAPE_MC = _float("MIN_TAPE_MC", 15_000)
 # Real runners are rare. 3 calls/day is already a lot.
 MAX_SIGNALS_PER_DAY = _int("MAX_SIGNALS_PER_DAY", 3)
 MIN_MATCH_SCORE = _int("MIN_MATCH_SCORE", 100)
@@ -104,7 +106,7 @@ MIN_UNIQUE_HOLDERS = _int("MIN_UNIQUE_HOLDERS", 25)
 MAX_FIRST_LOOK_MC = _float("MAX_FIRST_LOOK_MC", 200_000)
 # Full paper size at/under this. Between here and MAX_FIRST_LOOK we size down.
 PAPER_FULL_SIZE_MC = _float("PAPER_FULL_SIZE_MC", 80_000)
-# Copy farms (USWS/EYE style) — skip the whole ticker family, do not promote the original.
+# Same-ticker floods — farm mechanic, not a judgment of the letters.
 META_COPY_MIN = _int("META_COPY_MIN", 2)
 
 # --- Paper book (no real SOL) ---

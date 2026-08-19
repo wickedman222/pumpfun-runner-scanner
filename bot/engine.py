@@ -10,33 +10,13 @@ from . import config
 from .attention import (
     Attention,
     Story,
-    culture_hit_ok,
     extract_farm_reason,
-    is_common_subject,
-    is_distinctive_name,
-    is_generic_ticker,
-    is_meme_name,
-    score_match,
-    search_query_for,
 )
 from .pump import age_seconds, fetch_coin
 from .state import State
 from .structure import Structure, inspect
 
 log = logging.getLogger("runner")
-
-_targeted_hits: list[float] = []
-
-
-def _allow_targeted_search() -> bool:
-    now = time.time()
-    while _targeted_hits and now - _targeted_hits[0] > 60:
-        _targeted_hits.pop(0)
-    if len(_targeted_hits) >= 8:
-        return False
-    _targeted_hits.append(now)
-    return True
-
 
 def _created_ts(coin: dict) -> int:
     raw = int(coin.get("created_timestamp") or 0)
@@ -73,11 +53,6 @@ async def evaluate_new(
     if config.MAX_SIGNALS_PER_DAY > 0 and state.signals_today() >= config.MAX_SIGNALS_PER_DAY:
         v.failed_gate = "quota"
         v.fail_reason = "daily signal cap reached"
-        return v
-
-    if is_generic_ticker(coin.get("symbol", ""), coin.get("name", "")):
-        v.failed_gate = "generic"
-        v.fail_reason = "generic ticker/name"
         return v
 
     farm = extract_farm_reason(coin)
@@ -119,23 +94,14 @@ async def evaluate_new(
         v.fail_reason = f"already ${usd:,.0f} on first look"
         return v
 
+    # News only if a headline already exists in the window. Do not search
+    # Wikipedia/Google for the ticker — that is following a name.
     hits = attention.match_coin(coin["symbol"], coin["name"])
-    distinctive = is_distinctive_name(coin.get("symbol") or "", coin.get("name") or "")
-    common = is_common_subject(coin.get("symbol") or "", coin.get("name") or "")
-    if not hits and distinctive and not common and _allow_targeted_search():
-        targeted = await attention.search_subject(http, search_query_for(coin))
-        scored = []
-        for item in targeted:
-            s = score_match(coin["symbol"], coin["name"], item)
-            if s >= config.MIN_MATCH_SCORE:
-                scored.append((item, s))
-        scored.sort(key=lambda x: x[1], reverse=True)
-        hits = scored
     path = ""
     story = None
     match_score = 0
     participants = int(coin.get("num_participants") or 0)
-    if hits and culture_hit_ok(coin.get("symbol") or "", coin.get("name") or "", hits[0][0], hits[0][1]):
+    if hits and hits[0][1] >= config.MIN_MATCH_SCORE:
         path = "news"
         story, match_score = hits[0]
     elif (
@@ -152,19 +118,18 @@ async def evaluate_new(
             source="live",
             seen_at=time.time(),
         )
-    elif is_meme_name(coin.get("symbol") or "", coin.get("name") or ""):
-        path = "meme"
-        match_score = 80
-        who = coin.get("name") or coin.get("symbol")
+    elif usd >= config.MIN_TAPE_MC:
+        path = "tape"
+        match_score = 70
         story = Story(
-            title=f"Meme first-mover: {who}",
+            title=f"First-mover tape · MC ${usd:,.0f}",
             url=coin.get("url") or "",
-            source="meme",
+            source="tape",
             seen_at=time.time(),
         )
     else:
         v.failed_gate = "attention"
-        v.fail_reason = "no rare culture / live crowd / meme-name"
+        v.fail_reason = "no news map / live crowd / tape book"
         return v
 
     structure = await inspect(http, coin)

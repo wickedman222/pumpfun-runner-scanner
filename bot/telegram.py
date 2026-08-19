@@ -15,6 +15,16 @@ def _esc(text: object) -> str:
     return html.escape(str(text or ""), quote=False)
 
 
+def _why_token(path: str) -> str:
+    if path == "news":
+        return "first mint that maps to a headline already in the window"
+    if path == "live":
+        return "live crowd with a real book"
+    if path == "tape":
+        return "first-mover book with real expansion — name is not the reason"
+    return "first-mover book"
+
+
 async def send(http: httpx.AsyncClient, text: str, preview: bool = False) -> bool:
     url = f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
@@ -62,7 +72,7 @@ def format_signal(v: Verdict, expansion: str) -> str:
     lines += [
         "",
         "<b>WHY THIS TOKEN</b>",
-        "first mint that maps to the story in our window",
+        _esc(_why_token(v.path)),
         f"curve {coin.get('curve_pct')}% · MC ${_esc(f'{usd:,.0f}')} · ATH ${_esc(f'{ath:,.0f}')}",
         f"path {v.path or '—'} · replies {coin.get('reply_count')} · live {bool(coin.get('is_currently_live'))}"
         + (f" ({coin.get('num_participants')} in room)" if coin.get("num_participants") else ""),
@@ -91,7 +101,7 @@ def format_signal(v: Verdict, expansion: str) -> str:
         "a cleaner original appears",
         "the story stops spreading outside crypto",
         "",
-        "<i>Not a trade call. Attention + structure snapshot only. Most names still die.</i>",
+        "<i>Not a trade call. Structure + tape snapshot only. Most still die.</i>",
     ]
     return "\n".join(lines)
 
@@ -240,8 +250,8 @@ def mark_sol(pos: dict) -> float:
 async def boot_message(http: httpx.AsyncClient) -> None:
     text = (
         "<b>Pump.fun runner scanner online</b>\n"
-        "Calls: rare culture hit or a real live crowd. Few names. 3/day max.\n"
-        "USWS-class painted books stay banned. Not every BOOST coin.\n"
+        "Calls: live crowd, a headline already in the window, or first-mover tape.\n"
+        "The ticker spelling is not a signal. Mayhem / cashback / copy-farms stay out.\n"
         f"Leaderboard every {config.LEADERBOARD_SEC // 3600}h · paper balance every {config.PAPER_REPORT_SEC // 3600}h"
     )
     if config.PAPER_ENABLED:

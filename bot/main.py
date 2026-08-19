@@ -122,7 +122,7 @@ async def run() -> None:
                         if is_new:
                             log.info("Skip %s farm: %s", coin.get("symbol"), verdict.fail_reason)
                         continue
-                    if verdict.failed_gate in {"attention", "generic", "age", "quota", "late", "dumped"}:
+                    if verdict.failed_gate in {"attention", "age", "quota", "late", "dumped"}:
                         continue
                     if verdict.failed_gate == "structure":
                         log.info("Skip %s structure: %s", coin.get("symbol"), verdict.fail_reason)
