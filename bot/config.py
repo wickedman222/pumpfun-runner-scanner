@@ -102,7 +102,7 @@ TAPE_REFRESH_LIMIT = _int("TAPE_REFRESH_LIMIT", 50)
 MAX_SIGNALS_PER_DAY = _int("MAX_SIGNALS_PER_DAY", 0)
 # Only posts stamped with this id count toward the daily cap.
 # Bump when the strat changes so leftover rows from an old loop do not sit us out.
-SIGNAL_BOOK_ID = _env("SIGNAL_BOOK_ID", "explore-1")
+SIGNAL_BOOK_ID = _env("SIGNAL_BOOK_ID", "wallets-1")
 MIN_MATCH_SCORE = _int("MIN_MATCH_SCORE", 100)
 LEADERBOARD_SEC = _int("LEADERBOARD_SEC", 6 * 3600)
 LEADERBOARD_SIZE = _int("LEADERBOARD_SIZE", 15)
@@ -121,11 +121,22 @@ PAPER_FULL_SIZE_MC = _float("PAPER_FULL_SIZE_MC", 80_000)
 # Same-ticker floods — farm mechanic, not a judgment of the letters.
 META_COPY_MIN = _int("META_COPY_MIN", 2)
 
+# Follow wallets that sat in recent held runners (rugcheck holders).
+WALLET_HARVEST_SEC = _int("WALLET_HARVEST_SEC", 180)
+WALLET_MIN_RUNNERS = _int("WALLET_MIN_RUNNERS", 2)
+WALLET_MIN_OVERLAP = _int("WALLET_MIN_OVERLAP", 2)
+WALLET_MIN_PCT = _float("WALLET_MIN_PCT", 0.15)
+WALLET_MAX_PCT = _float("WALLET_MAX_PCT", 8.0)
+RUNNER_MIN_ATH = _float("RUNNER_MIN_ATH", 200_000)
+RUNNER_MAX_AGE_SEC = _int("RUNNER_MAX_AGE_SEC", 48 * 3600)
+RUNNER_MAX_DD = _float("RUNNER_MAX_DD", 0.40)
+WALLET_MAX_BUY_MC = _float("WALLET_MAX_BUY_MC", 150_000)
+
 # --- Paper book (no real SOL) ---
 PAPER_ENABLED = _int("PAPER_ENABLED", 1) == 1
 PAPER_START_SOL = _float("PAPER_START_SOL", 2.0)
 # Bump this string to flatten the paper book and start from PAPER_START_SOL again.
-PAPER_BOOK_ID = _env("PAPER_BOOK_ID", "explore-1")
+PAPER_BOOK_ID = _env("PAPER_BOOK_ID", "wallets-1")
 PAPER_SIZE_FRAC = _float("PAPER_SIZE_FRAC", 0.075)  # 2 SOL → 0.15
 PAPER_SIZE_MIN = _float("PAPER_SIZE_MIN", 0.10)
 PAPER_SIZE_MAX = _float("PAPER_SIZE_MAX", 0.20)

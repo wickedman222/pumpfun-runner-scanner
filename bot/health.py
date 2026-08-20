@@ -19,6 +19,7 @@ STATUS = {
     "watches": 0,
     "feeds": {},
     "tape": {},
+    "smart_wallets": 0,
 }
 
 

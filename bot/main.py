@@ -7,6 +7,7 @@ import time
 from . import config, health, paper
 from .attention import Attention
 from .engine import evaluate_new
+from . import wallets as walletmod
 from .httputil import client
 from .pump import (
     active_coins,
@@ -65,6 +66,7 @@ async def run() -> None:
     last_leaderboard = time.time()
     last_paper_report = time.time()
     last_feed_log = 0.0
+    last_wallet_harvest = 0.0
 
     health.STATUS["ok"] = True
     health.start(config.PORT)
@@ -83,14 +85,7 @@ async def run() -> None:
         except Exception as exc:
             log.warning("Initial attention refresh failed: %s", exc)
 
-        log.info(
-            "Scanner loop started. poll=%ss spot $%.0f–$%.0fk on-curve · buy +%.0f%% after %ss hold, never grad-fill",
-            config.PUMP_POLL_SEC,
-            config.MIN_ARM_MC,
-            config.MAX_ARM_MC / 1000,
-            (config.EXPANSION_MULT - 1) * 100,
-            config.MIN_ARM_HOLD_SEC,
-        )
+        log.info("Scanner loop started. spot on-curve + follow wallets from held runners")
 
         while True:
             loop_start = time.time()
@@ -105,6 +100,27 @@ async def run() -> None:
                 trading = await active_coins(http, limit=80)
                 graduates = await graduated_coins(http, limit=25)
                 followed = await _refresh_tracked(http, state)
+                walletmod.reset_loop_budget()
+                if time.time() - last_wallet_harvest >= config.WALLET_HARVEST_SEC:
+                    harvested = 0
+                    for mint in walletmod.SEED_RUNNERS:
+                        c = await fetch_coin(http, mint)
+                        if c:
+                            harvested += await walletmod.harvest_coin(
+                                http, state, c, force=True
+                            )
+                    runners = await walletmod.top_runners(http)
+                    harvested += await walletmod.harvest(
+                        http, state, runners + trading + graduates
+                    )
+                    last_wallet_harvest = time.time()
+                    health.STATUS["smart_wallets"] = state.smart_wallet_count()
+                    if harvested:
+                        log.info(
+                            "Wallet harvest +%s · following %s wallets",
+                            harvested,
+                            state.smart_wallet_count(),
+                        )
                 stats = state.tape_stats()
                 health.STATUS["feeds"] = {
                     "latest": len(fresh),
@@ -118,7 +134,7 @@ async def run() -> None:
                 if time.time() - last_feed_log >= 60:
                     log.info(
                         "feeds latest=%s live=%s last_trade=%s graduated=%s follow=%s "
-                        "tape young=%s armed=%s watching=%s posted_today=%s",
+                        "tape young=%s armed=%s watching=%s posted_today=%s wallets=%s",
                         len(fresh),
                         len(streaming),
                         len(trading),
@@ -128,6 +144,7 @@ async def run() -> None:
                         stats.get("armed"),
                         stats.get("watching"),
                         state.signals_today(),
+                        state.smart_wallet_count(),
                     )
                     last_feed_log = time.time()
                 seen_this_loop: set[str] = set()

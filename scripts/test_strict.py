@@ -102,7 +102,7 @@ async def _engine_paths() -> None:
             return await evaluate_new(None, att, st, row)
 
     v = await run(coin(75_000, mint="grad1", complete=True))
-    assert v.post is False and v.failed_gate == "skip", (v.failed_gate, v.fail_reason)
+    assert v.post is False and v.failed_gate == "late", (v.failed_gate, v.fail_reason)
 
     v = await run(coin(12_000, mint="arm1", complete=False))
     assert v.failed_gate == "watch", (v.failed_gate, v.fail_reason)
@@ -120,4 +120,19 @@ async def _engine_paths() -> None:
 import asyncio
 
 asyncio.run(_engine_paths())
+
+from bot.state import State
+from bot.wallets import wallet_buy_ok
+
+tmp = tempfile.mkdtemp()
+st = State(os.path.join(tmp, "w.db"))
+st.note_smart_wallet("Wa", "mintA", 1.0)
+st.note_smart_wallet("Wa", "mintB", 1.0)
+st.note_smart_wallet("Wb", "mintA", 0.8)
+st.note_smart_wallet("Wb", "mintB", 0.8)
+assert st.smart_wallet_runners("Wa", exclude_mint="mintC") == 2
+assert st.smart_wallet_count() == 2
+assert wallet_buy_ok(coin(4_000), now).startswith("thin")
+assert wallet_buy_ok(coin(25_000, ath=26_000), now) == ""
+
 print("strict buy rules ok")

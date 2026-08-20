@@ -12,6 +12,7 @@ from .pump import fetch_coin
 from .state import State
 from .structure import Structure, inspect
 from .tape import decide as tape_decide
+from .wallets import overlap as wallet_overlap, wallet_buy_ok
 
 log = logging.getLogger("runner")
 
@@ -66,9 +67,20 @@ async def evaluate_new(
             gate = "dumped"
         elif "older mint" in call.reason:
             gate = "first-mover"
-        elif "already $" in call.reason or "chase" in call.reason:
+        elif "already $" in call.reason or "chase" in call.reason or "too far" in call.reason or "graduated" in call.reason:
             gate = "late"
         v.failed_gate = gate
+        if gate in {"farm", "age", "dumped"}:
+            state.mark_tape(mint, "skipped", call.reason)
+            return v
+        # late / first-mover: still allow wallet cluster (BULLBALLS was a later mint)
+        why = wallet_buy_ok(coin, time.time())
+        if why:
+            state.mark_tape(mint, "skipped", call.reason)
+            return v
+        wallet_call = await _maybe_wallet(http, state, coin, v)
+        if wallet_call:
+            return wallet_call
         state.mark_tape(mint, "skipped", call.reason)
         return v
 
@@ -81,11 +93,13 @@ async def evaluate_new(
             source="tape",
             seen_at=time.time(),
         )
-        return v
+        wallet_call = await _maybe_wallet(http, state, coin, v)
+        return wallet_call or v
 
     if call.action == "watch":
         v.failed_gate = "watch"
-        return v
+        wallet_call = await _maybe_wallet(http, state, coin, v)
+        return wallet_call or v
 
     if config.MAX_SIGNALS_PER_DAY > 0 and state.signals_today() >= config.MAX_SIGNALS_PER_DAY:
         v.failed_gate = "quota"
@@ -107,6 +121,38 @@ async def evaluate_new(
         title=f"Tape buy-in · {call.reason}",
         url=coin.get("url") or "",
         source="tape",
+        seen_at=time.time(),
+    )
+    return v
+
+
+async def _maybe_wallet(http: httpx.AsyncClient, state: State, coin: dict, v: Verdict) -> Verdict | None:
+    why = wallet_buy_ok(coin, time.time())
+    if why:
+        return None
+    hits = await wallet_overlap(http, state, coin)
+    if len(hits) < config.WALLET_MIN_OVERLAP:
+        return None
+    if config.MAX_SIGNALS_PER_DAY > 0 and state.signals_today() >= config.MAX_SIGNALS_PER_DAY:
+        v.failed_gate = "quota"
+        v.fail_reason = "daily signal cap reached"
+        return v
+    structure = await inspect(http, coin)
+    v.structure = structure
+    if not structure.ok:
+        v.failed_gate = "structure"
+        v.fail_reason = "; ".join(structure.reasons_fail)
+        return v
+    names = ", ".join(f"{w[:6]}…×{n}" for w, _pct, n in hits[:4])
+    v.post = True
+    v.path = "wallet"
+    v.match_score = 90
+    v.failed_gate = ""
+    v.fail_reason = f"{len(hits)} runner wallets in book ({names})"
+    v.story = Story(
+        title=f"Wallet follow · {len(hits)} runner wallets already in",
+        url=coin.get("url") or "",
+        source="wallet",
         seen_at=time.time(),
     )
     return v

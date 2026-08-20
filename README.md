@@ -17,6 +17,7 @@ Every gate must pass. There is **no daily trade cap** — if several names hit t
 1. **Spot** — every launch. Arm only on-curve, **$8k–$50k**, near ATH. First look already graduated is skipped.
 2. **Wait** — at least 4 minutes after the arm so a 12-second wick is not a buy.
 3. **Buy** — still within 25% of ATH, **+60% from our arm**, MC still under ~$120k. Structure only at buy.
+4. **Or wallet follow** — harvest holders from recent coins that actually ran (ATH ≥ $200k, still near highs). If **two** of those wallets are already in a young book, that is the buy. Graduation fill is still not a buy.
 
 Never:
 

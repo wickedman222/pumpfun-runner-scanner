@@ -36,6 +36,14 @@ CREATE TABLE IF NOT EXISTS pending (
 );
 CREATE INDEX IF NOT EXISTS idx_seen_created ON seen_mints(created_ts);
 CREATE INDEX IF NOT EXISTS idx_seen_symbol ON seen_mints(symbol);
+CREATE TABLE IF NOT EXISTS smart_wallet_mints (
+    wallet TEXT NOT NULL,
+    mint TEXT NOT NULL,
+    pct REAL,
+    seen_at INTEGER,
+    PRIMARY KEY (wallet, mint)
+);
+CREATE INDEX IF NOT EXISTS idx_smart_wallet ON smart_wallet_mints(wallet);
 CREATE TABLE IF NOT EXISTS tape (
     mint TEXT PRIMARY KEY,
     symbol TEXT,
@@ -129,6 +137,14 @@ class State:
                 con.execute("ALTER TABLE posted ADD COLUMN book_id TEXT")
             con.executescript(
                 """
+                CREATE TABLE IF NOT EXISTS smart_wallet_mints (
+                    wallet TEXT NOT NULL,
+                    mint TEXT NOT NULL,
+                    pct REAL,
+                    seen_at INTEGER,
+                    PRIMARY KEY (wallet, mint)
+                );
+                CREATE INDEX IF NOT EXISTS idx_smart_wallet ON smart_wallet_mints(wallet);
                 CREATE TABLE IF NOT EXISTS tape (
                     mint TEXT PRIMARY KEY,
                     symbol TEXT,
@@ -339,6 +355,45 @@ class State:
             "armed": int(armed),
             "watching": int(watching),
         }
+
+    def note_smart_wallet(self, wallet: str, mint: str, pct: float) -> None:
+        wallet = (wallet or "").strip()
+        mint = (mint or "").strip()
+        if not wallet or not mint:
+            return
+        with self._conn() as con:
+            con.execute(
+                """
+                INSERT INTO smart_wallet_mints(wallet, mint, pct, seen_at)
+                VALUES (?,?,?,?)
+                ON CONFLICT(wallet, mint) DO UPDATE SET pct = excluded.pct, seen_at = excluded.seen_at
+                """,
+                (wallet, mint, pct, int(time.time())),
+            )
+
+    def smart_wallet_runners(self, wallet: str, exclude_mint: str = "") -> int:
+        wallet = (wallet or "").strip()
+        if not wallet:
+            return 0
+        with self._conn() as con:
+            if exclude_mint:
+                row = con.execute(
+                    "SELECT COUNT(*) n FROM smart_wallet_mints WHERE wallet = ? AND mint != ?",
+                    (wallet, exclude_mint),
+                ).fetchone()
+            else:
+                row = con.execute(
+                    "SELECT COUNT(*) n FROM smart_wallet_mints WHERE wallet = ?",
+                    (wallet,),
+                ).fetchone()
+        return int(row["n"] if row else 0)
+
+    def smart_wallet_count(self) -> int:
+        with self._conn() as con:
+            row = con.execute(
+                "SELECT COUNT(DISTINCT wallet) n FROM smart_wallet_mints"
+            ).fetchone()
+        return int(row["n"] if row else 0)
 
     def already_posted(self, mint: str) -> bool:
         with self._conn() as con:

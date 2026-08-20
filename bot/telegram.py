@@ -18,6 +18,8 @@ def _esc(text: object) -> str:
 def _why_token(path: str) -> str:
     if path == "live":
         return "live crowd with a real book"
+    if path == "wallet":
+        return "wallets that sat in recent held runners are already in this book"
     return "spotted on-curve, then bought only after it held and expanded — not the graduation fill"
 
 
@@ -251,8 +253,8 @@ async def boot_message(
 ) -> None:
     text = (
         "<b>Pump.fun runner scanner online</b>\n"
-        "Spot every launch on-curve. Buy only if it holds and expands from our arm.\n"
-        "Graduation alone is not a buy — that was the dump. No daily cap.\n"
+        "Spot on-curve, or follow wallets that sat in recent held runners.\n"
+        "Graduation fill is not a buy. No daily cap.\n"
         f"Leaderboard every {config.LEADERBOARD_SEC // 3600}h · paper balance every {config.PAPER_REPORT_SEC // 3600}h"
     )
     if config.PAPER_ENABLED and snap:
