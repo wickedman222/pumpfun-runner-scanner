@@ -2,7 +2,7 @@
 
 Posts **only high-conviction Pump.fun candidates** to Telegram.
 
-Every new mint is scanned and its market-cap tape is stored. Buy-in is the backtested trigger: first print we actually recorded in the **$8k–$200k** band, then **+20% or graduation**, first-mover, not a painted farm, clean structure. A name is not a signal. Most days it still posts little. That is the design.
+Every new mint is scanned. **Spot** it on-curve in the $8k–$50k band. **Buy** only if that same mint is still near ATH, at least **+60% from our arm**, and at least **4 minutes** have passed. Graduation by itself is not a buy — that print is exit liquidity and is what slowly bled the paper book.
 
 No real-SOL trading. After a call it opens a **paper** position (starts at 2 SOL) and manages scale-outs / dead exits in Telegram.
 
@@ -14,9 +14,9 @@ Repo: [github.com/wickedman222/pumpfun-runner-scanner](https://github.com/wicked
 
 Every gate must pass. There is **no daily trade cap** — if several names hit the trigger, we take them (paper still max 5 open at once).
 
-1. **See every launch** — `latest` plus last-trade, graduates, and a refetch of young mints we already stored (so a coin that leaves `latest` at $4k is still followed).
-2. **Arm** on the first print in **$8k–$200k**.
-3. **Buy** when that same mint then does **+20% from our armed print**, or graduates / has a real live crowd. Structure is checked only at buy, not on every birth.
+1. **Spot** — every launch. Arm only on-curve, **$8k–$50k**, near ATH. First look already graduated is skipped.
+2. **Wait** — at least 4 minutes after the arm so a 12-second wick is not a buy.
+3. **Buy** — still within 25% of ATH, **+60% from our arm**, MC still under ~$120k. Structure only at buy.
 
 Never:
 

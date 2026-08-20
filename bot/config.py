@@ -88,18 +88,21 @@ MAX_LIVE_AGE_SEC = _int("MAX_LIVE_AGE_SEC", 6 * 3600)
 MAX_ACTIVE_AGE_SEC = _int("MAX_ACTIVE_AGE_SEC", 6 * 3600)
 MIN_LIVE_PARTICIPANTS = _int("MIN_LIVE_PARTICIPANTS", 15)
 MIN_LIVE_MC = _float("MIN_LIVE_MC", 8_000)
-# Tape path: a real book, not a $500 tick. Name is not a filter.
-# Backtest arm band: first print $8k–$200k, then +20% or graduate.
+# Spot on-curve early. Buy confirmed strength. Graduation alone is not a buy.
 MIN_ARM_MC = _float("MIN_ARM_MC", 8_000)
+MAX_ARM_MC = _float("MAX_ARM_MC", 50_000)
 MIN_TAPE_MC = _float("MIN_TAPE_MC", MIN_ARM_MC)
+MIN_BUY_MC = _float("MIN_BUY_MC", 18_000)
+MIN_ARM_HOLD_SEC = _int("MIN_ARM_HOLD_SEC", 240)
+MAX_DD_AT_BUY = _float("MAX_DD_AT_BUY", 0.25)
 GRADUATE_CONFIRM_MC = _float("GRADUATE_CONFIRM_MC", 60_000)
-EXPANSION_MULT = _float("EXPANSION_MULT", 1.20)
+EXPANSION_MULT = _float("EXPANSION_MULT", 1.60)
 TAPE_REFRESH_LIMIT = _int("TAPE_REFRESH_LIMIT", 50)
 # 0 = no daily trade cap. Runners are rare enough; do not sit them out.
 MAX_SIGNALS_PER_DAY = _int("MAX_SIGNALS_PER_DAY", 0)
 # Only posts stamped with this id count toward the daily cap.
 # Bump when the strat changes so leftover rows from an old loop do not sit us out.
-SIGNAL_BOOK_ID = _env("SIGNAL_BOOK_ID", "tape-1")
+SIGNAL_BOOK_ID = _env("SIGNAL_BOOK_ID", "explore-1")
 MIN_MATCH_SCORE = _int("MIN_MATCH_SCORE", 100)
 LEADERBOARD_SEC = _int("LEADERBOARD_SEC", 6 * 3600)
 LEADERBOARD_SIZE = _int("LEADERBOARD_SIZE", 15)
@@ -111,10 +114,8 @@ MAX_TOP10_PCT = _float("MAX_TOP10_PCT", 40.0)
 MAX_INSIDER_PCT = _float("MAX_INSIDER_PCT", 20.0)
 MAX_RUGCHECK_SCORE = _int("MAX_RUGCHECK_SCORE", 1500)
 MIN_UNIQUE_HOLDERS = _int("MIN_UNIQUE_HOLDERS", 25)
-# Hard chase-line only. Graduation is ~$69k — an $80k cap cuts off the
-# "just graduated and still running" names that actually build a 2 SOL book.
-# Above ~$200k a 4x is already a $800k+ coin; that is a different trade.
-MAX_FIRST_LOOK_MC = _float("MAX_FIRST_LOOK_MC", 200_000)
+# Chase line at buy. $200k first-prints were graduation snipes, not entries.
+MAX_FIRST_LOOK_MC = _float("MAX_FIRST_LOOK_MC", 120_000)
 # Full paper size at/under this. Between here and MAX_FIRST_LOOK we size down.
 PAPER_FULL_SIZE_MC = _float("PAPER_FULL_SIZE_MC", 80_000)
 # Same-ticker floods — farm mechanic, not a judgment of the letters.
@@ -124,7 +125,7 @@ META_COPY_MIN = _int("META_COPY_MIN", 2)
 PAPER_ENABLED = _int("PAPER_ENABLED", 1) == 1
 PAPER_START_SOL = _float("PAPER_START_SOL", 2.0)
 # Bump this string to flatten the paper book and start from PAPER_START_SOL again.
-PAPER_BOOK_ID = _env("PAPER_BOOK_ID", "overnight-1")
+PAPER_BOOK_ID = _env("PAPER_BOOK_ID", "explore-1")
 PAPER_SIZE_FRAC = _float("PAPER_SIZE_FRAC", 0.075)  # 2 SOL → 0.15
 PAPER_SIZE_MIN = _float("PAPER_SIZE_MIN", 0.10)
 PAPER_SIZE_MAX = _float("PAPER_SIZE_MAX", 0.20)

@@ -84,11 +84,12 @@ async def run() -> None:
             log.warning("Initial attention refresh failed: %s", exc)
 
         log.info(
-            "Scanner loop started. poll=%ss track every launch · buy = $%.0f–$%.0fk then +%.0f%% or graduate",
+            "Scanner loop started. poll=%ss spot $%.0f–$%.0fk on-curve · buy +%.0f%% after %ss hold, never grad-fill",
             config.PUMP_POLL_SEC,
             config.MIN_ARM_MC,
-            config.MAX_FIRST_LOOK_MC / 1000,
+            config.MAX_ARM_MC / 1000,
             (config.EXPANSION_MULT - 1) * 100,
+            config.MIN_ARM_HOLD_SEC,
         )
 
         while True:

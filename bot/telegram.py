@@ -18,7 +18,7 @@ def _esc(text: object) -> str:
 def _why_token(path: str) -> str:
     if path == "live":
         return "live crowd with a real book"
-    return "first print we tracked in the $8k–$200k band, then +20% or graduation"
+    return "spotted on-curve, then bought only after it held and expanded — not the graduation fill"
 
 
 async def send(http: httpx.AsyncClient, text: str, preview: bool = False) -> bool:
@@ -251,8 +251,8 @@ async def boot_message(
 ) -> None:
     text = (
         "<b>Pump.fun runner scanner online</b>\n"
-        "Core: every launch is tracked. Buy = first $8k–$200k print we recorded, then +20% or graduate.\n"
-        "Name is not a signal. Mayhem / cashback / copy-farms stay out. No daily trade cap.\n"
+        "Spot every launch on-curve. Buy only if it holds and expands from our arm.\n"
+        "Graduation alone is not a buy — that was the dump. No daily cap.\n"
         f"Leaderboard every {config.LEADERBOARD_SEC // 3600}h · paper balance every {config.PAPER_REPORT_SEC // 3600}h"
     )
     if config.PAPER_ENABLED and snap:
