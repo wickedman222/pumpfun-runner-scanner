@@ -41,6 +41,8 @@ CREATE TABLE IF NOT EXISTS smart_wallet_mints (
     mint TEXT NOT NULL,
     pct REAL,
     seen_at INTEGER,
+    symbol TEXT,
+    ath_mc REAL,
     PRIMARY KEY (wallet, mint)
 );
 CREATE INDEX IF NOT EXISTS idx_smart_wallet ON smart_wallet_mints(wallet);
@@ -146,6 +148,8 @@ class State:
                     mint TEXT NOT NULL,
                     pct REAL,
                     seen_at INTEGER,
+                    symbol TEXT,
+                    ath_mc REAL,
                     PRIMARY KEY (wallet, mint)
                 );
                 CREATE INDEX IF NOT EXISTS idx_smart_wallet ON smart_wallet_mints(wallet);
@@ -174,6 +178,11 @@ class State:
                 CREATE INDEX IF NOT EXISTS idx_tape_created ON tape(created_ts);
                 """
             )
+            sw_cols = {row[1] for row in con.execute("PRAGMA table_info(smart_wallet_mints)")}
+            if sw_cols and "symbol" not in sw_cols:
+                con.execute("ALTER TABLE smart_wallet_mints ADD COLUMN symbol TEXT")
+            if sw_cols and "ath_mc" not in sw_cols:
+                con.execute("ALTER TABLE smart_wallet_mints ADD COLUMN ath_mc REAL")
 
     @contextmanager
     def _conn(self):
@@ -364,7 +373,14 @@ class State:
             "watching": int(watching),
         }
 
-    def note_smart_wallet(self, wallet: str, mint: str, pct: float) -> None:
+    def note_smart_wallet(
+        self,
+        wallet: str,
+        mint: str,
+        pct: float,
+        symbol: str = "",
+        ath_mc: float = 0.0,
+    ) -> None:
         wallet = (wallet or "").strip()
         mint = (mint or "").strip()
         if not wallet or not mint:
@@ -372,12 +388,69 @@ class State:
         with self._conn() as con:
             con.execute(
                 """
-                INSERT INTO smart_wallet_mints(wallet, mint, pct, seen_at)
-                VALUES (?,?,?,?)
-                ON CONFLICT(wallet, mint) DO UPDATE SET pct = excluded.pct, seen_at = excluded.seen_at
+                INSERT INTO smart_wallet_mints(wallet, mint, pct, seen_at, symbol, ath_mc)
+                VALUES (?,?,?,?,?,?)
+                ON CONFLICT(wallet, mint) DO UPDATE SET
+                    pct = excluded.pct,
+                    seen_at = excluded.seen_at,
+                    symbol = COALESCE(excluded.symbol, symbol),
+                    ath_mc = MAX(COALESCE(ath_mc, 0), COALESCE(excluded.ath_mc, 0))
                 """,
-                (wallet, mint, pct, int(time.time())),
+                (wallet, mint, pct, int(time.time()), (symbol or "").upper(), float(ath_mc or 0)),
             )
+
+    def wallet_report(self, limit: int = 12) -> dict:
+        with self._conn() as con:
+            wallets = con.execute(
+                """
+                SELECT wallet, COUNT(*) AS n, MAX(ath_mc) AS best_ath
+                FROM smart_wallet_mints
+                GROUP BY wallet
+                ORDER BY n DESC, best_ath DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+            coins = con.execute(
+                """
+                SELECT mint, MAX(symbol) AS symbol, MAX(ath_mc) AS ath_mc, COUNT(*) AS wallets
+                FROM smart_wallet_mints
+                GROUP BY mint
+                ORDER BY ath_mc DESC
+                LIMIT 8
+                """
+            ).fetchall()
+            total = con.execute(
+                "SELECT COUNT(DISTINCT wallet) n FROM smart_wallet_mints"
+            ).fetchone()["n"]
+            mints_n = con.execute(
+                "SELECT COUNT(DISTINCT mint) n FROM smart_wallet_mints"
+            ).fetchone()["n"]
+        ranked = []
+        with self._conn() as con:
+            for row in wallets:
+                w = row["wallet"]
+                runs = con.execute(
+                    """
+                    SELECT mint, symbol, ath_mc FROM smart_wallet_mints
+                    WHERE wallet = ? ORDER BY ath_mc DESC LIMIT 4
+                    """,
+                    (w,),
+                ).fetchall()
+                ranked.append(
+                    {
+                        "wallet": w,
+                        "n": int(row["n"]),
+                        "best_ath": float(row["best_ath"] or 0),
+                        "runs": [dict(r) for r in runs],
+                    }
+                )
+        return {
+            "wallets": int(total),
+            "mints": int(mints_n),
+            "top": ranked,
+            "coins": [dict(c) for c in coins],
+        }
 
     def smart_wallet_runners(self, wallet: str, exclude_mint: str = "") -> int:
         wallet = (wallet or "").strip()

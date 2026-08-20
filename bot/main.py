@@ -23,6 +23,7 @@ from .telegram import (
     format_paper_book,
     format_paper_fill,
     format_signal,
+    format_wallet_follow,
     send,
 )
 
@@ -67,6 +68,7 @@ async def run() -> None:
     last_paper_report = time.time()
     last_feed_log = 0.0
     last_wallet_harvest = 0.0
+    last_wallet_report = 0.0
 
     health.STATUS["ok"] = True
     health.start(config.PORT)
@@ -195,6 +197,10 @@ async def run() -> None:
                     await _send_leaderboard(http, state, attention, health.STATUS.get("seen", 0))
                     last_leaderboard = time.time()
 
+                if time.time() - last_wallet_report >= config.WALLET_REPORT_SEC:
+                    await _send_wallet_report(http, state)
+                    last_wallet_report = time.time()
+
                 health.STATUS["last_error"] = ""
             except Exception as exc:
                 health.STATUS["last_error"] = str(exc)
@@ -257,6 +263,20 @@ async def _emit_buy(http, state: State, verdict) -> None:
     snap = paper.snapshot(state)
     health.STATUS["paper_equity"] = round(snap["equity"], 4)
     await send(http, format_paper_fill(fill, snap), preview=True)
+
+
+async def _send_wallet_report(http, state: State) -> None:
+    rep = state.wallet_report(config.WALLET_REPORT_SIZE)
+    text = format_wallet_follow(rep)
+    ok = await send(http, text)
+    if ok:
+        log.info(
+            "Wallet follow report sent (%s wallets, %s mints)",
+            rep.get("wallets"),
+            rep.get("mints"),
+        )
+    else:
+        log.error("Wallet follow report failed")
 
 
 async def _send_leaderboard(http, state: State, attention, scanned: int) -> None:

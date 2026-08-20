@@ -101,28 +101,12 @@ async def evaluate_new(
         wallet_call = await _maybe_wallet(http, state, coin, v)
         return wallet_call or v
 
-    if config.MAX_SIGNALS_PER_DAY > 0 and state.signals_today() >= config.MAX_SIGNALS_PER_DAY:
-        v.failed_gate = "quota"
-        v.fail_reason = "daily signal cap reached"
-        return v
-
-    structure = await inspect(http, coin)
-    v.structure = structure
-    if not structure.ok:
-        v.failed_gate = "structure"
-        v.fail_reason = "; ".join(structure.reasons_fail)
-        return v
-
-    v.post = True
-    v.path = "tape"
-    v.match_score = 80
-    v.failed_gate = ""
-    v.story = Story(
-        title=f"Tape buy-in · {call.reason}",
-        url=coin.get("url") or "",
-        source="tape",
-        seen_at=time.time(),
-    )
+    # Tape expansion is a watch, not a buy. Buy-in is runner-wallet cluster.
+    wallet_call = await _maybe_wallet(http, state, coin, v)
+    if wallet_call:
+        return wallet_call
+    v.failed_gate = "watch"
+    v.fail_reason = f"{call.reason} · waiting for runner wallets"
     return v
 
 

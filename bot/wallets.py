@@ -86,8 +86,10 @@ async def harvest_coin(
     mint = coin.get("mint") or ""
     n = 0
     holders = await fetch_holders(http, coin)
+    symbol = (coin.get("symbol") or "").upper()
+    ath = float(coin.get("ath_market_cap") or coin.get("usd_market_cap") or 0)
     for wallet, pct in holders[:20]:
-        state.note_smart_wallet(wallet, mint, pct)
+        state.note_smart_wallet(wallet, mint, pct, symbol=symbol, ath_mc=ath)
         n += 1
     hidden = await harvest_early_buyers(http, state, coin)
     n += hidden
@@ -178,7 +180,13 @@ async def harvest_early_buyers(http: httpx.AsyncClient, state: State, coin: dict
         if not bought:
             continue
         seen.add(payer)
-        state.note_smart_wallet(payer, mint, 0.0)
+        state.note_smart_wallet(
+            payer,
+            mint,
+            0.0,
+            symbol=(coin.get("symbol") or "").upper(),
+            ath_mc=float(coin.get("ath_market_cap") or coin.get("usd_market_cap") or 0),
+        )
     state.mark_tx_harvested(mint)
     return len(seen)
 

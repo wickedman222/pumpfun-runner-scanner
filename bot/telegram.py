@@ -208,6 +208,52 @@ def format_paper_fill(fill, snap: dict) -> str:
     return "\n".join(lines)
 
 
+def _wallet_x(ath: float) -> str:
+    if ath <= 0:
+        return "—"
+    x = ath / 10_000.0
+    if x >= 100:
+        return f"{x:.0f}x"
+    if x >= 10:
+        return f"{x:.1f}x"
+    return f"{x:.2f}x"
+
+
+def format_wallet_follow(rep: dict) -> str:
+    lines = [
+        "<b>WALLET FOLLOW</b>",
+        f"{rep.get('wallets') or 0} wallets · {rep.get('mints') or 0} runner coins",
+        "x is ATH vs a $10k book",
+        "",
+    ]
+    top = rep.get("top") or []
+    if not top:
+        lines.append("Still collecting. No wallets scored yet.")
+        return "\n".join(lines)
+    for i, row in enumerate(top, start=1):
+        w = row.get("wallet") or ""
+        short = f"{w[:4]}…{w[-4:]}" if len(w) > 10 else w
+        link = f"<a href=\"https://solscan.io/account/{_esc(w)}\">{_esc(short)}</a>"
+        lines.append(f"{i}. {link}  <b>{int(row.get('n') or 0)} runners</b>")
+        bits = []
+        for run in row.get("runs") or []:
+            sym = (run.get("symbol") or "?").strip() or "?"
+            ath = float(run.get("ath_mc") or 0)
+            bits.append(f"${_esc(sym)} {_esc(_wallet_x(ath))}")
+        if bits:
+            lines.append("   " + " · ".join(bits))
+    coins = rep.get("coins") or []
+    if coins:
+        lines += ["", "<b>Harvested runners</b>"]
+        for c in coins[:6]:
+            sym = (c.get("symbol") or "?").strip() or "?"
+            ath = float(c.get("ath_mc") or 0)
+            n = int(c.get("wallets") or 0)
+            lines.append(f"${_esc(sym)}  {_esc(_wallet_x(ath))}  {n} wallets")
+    lines.append("\n<i>Buy when 2 of these show up in a young book near highs.</i>")
+    return "\n".join(lines)
+
+
 def format_paper_book(snap: dict) -> str:
     pnl = snap["equity"] - snap["start"]
     lines = [
@@ -255,7 +301,7 @@ async def boot_message(
         "<b>Pump.fun runner scanner online</b>\n"
         "Spot on-curve, or follow wallets that sat in recent held runners.\n"
         "Graduation fill is not a buy. No daily cap.\n"
-        f"Leaderboard every {config.LEADERBOARD_SEC // 3600}h · paper balance every {config.PAPER_REPORT_SEC // 3600}h"
+        f"Wallet book every {config.WALLET_REPORT_SEC // 3600}h · paper every {config.PAPER_REPORT_SEC // 3600}h"
     )
     if config.PAPER_ENABLED and snap:
         if reset:

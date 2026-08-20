@@ -114,7 +114,7 @@ async def _engine_paths() -> None:
             (int(time.time()) - 400, "arm1"),
         )
     v = await run(coin(22_000, mint="arm1", complete=False, ath=22_000))
-    assert v.post is True, (v.failed_gate, v.fail_reason)
+    assert v.post is False and v.failed_gate == "watch", (v.failed_gate, v.fail_reason)
 
 
 import asyncio
@@ -126,10 +126,14 @@ from bot.wallets import wallet_buy_ok
 
 tmp = tempfile.mkdtemp()
 st = State(os.path.join(tmp, "w.db"))
-st.note_smart_wallet("Wa", "mintA", 1.0)
-st.note_smart_wallet("Wa", "mintB", 1.0)
-st.note_smart_wallet("Wb", "mintA", 0.8)
-st.note_smart_wallet("Wb", "mintB", 0.8)
+st.note_smart_wallet("Wa", "mintA", 1.0, symbol="BULLBALLS", ath_mc=1_560_000)
+st.note_smart_wallet("Wa", "mintB", 1.0, symbol="FISHBONE", ath_mc=350_000)
+st.note_smart_wallet("Wb", "mintA", 0.8, symbol="BULLBALLS", ath_mc=1_560_000)
+st.note_smart_wallet("Wb", "mintB", 0.8, symbol="FISHBONE", ath_mc=350_000)
+rep = st.wallet_report(5)
+assert rep["wallets"] == 2
+assert rep["top"][0]["n"] == 2
+assert any(r.get("symbol") == "BULLBALLS" for r in rep["top"][0]["runs"])
 assert st.smart_wallet_runners("Wa", exclude_mint="mintC") == 2
 assert st.smart_wallet_count() == 2
 assert not st.tx_harvested("mintA")
