@@ -15,6 +15,7 @@ from .pump import (
     graduated_coins,
     latest_coins,
     live_coins,
+    market_cap_coins,
 )
 from .state import State
 from .telegram import (
@@ -112,8 +113,9 @@ async def run() -> None:
                                 http, state, c, force=True
                             )
                     runners = await walletmod.top_runners(http)
+                    loud = await market_cap_coins(http, limit=30)
                     harvested += await walletmod.harvest(
-                        http, state, runners + trading + graduates
+                        http, state, runners + trading + graduates + loud
                     )
                     last_wallet_harvest = time.time()
                     health.STATUS["smart_wallets"] = state.smart_wallet_count()

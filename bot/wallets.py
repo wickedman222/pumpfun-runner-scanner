@@ -16,7 +16,7 @@ import httpx
 from . import config
 from .attention import extract_farm_reason
 from .httputil import get_json
-from .pump import age_seconds, normalize_coin
+from .pump import age_seconds, fetch_coin, normalize_coin
 from .state import State
 
 log = logging.getLogger("runner")
@@ -79,9 +79,18 @@ def is_held_runner(coin: dict, now: float) -> bool:
 async def harvest_coin(
     http: httpx.AsyncClient, state: State, coin: dict, force: bool = False
 ) -> int:
-    if not force and not is_held_runner(coin, time.time()):
+    farm = extract_farm_reason(coin)
+    if farm:
+        dropped = state.drop_wallets_from_mint(coin.get("mint") or "")
+        if dropped:
+            log.info(
+                "Drop %s farm wallets from %s (%s)",
+                dropped,
+                coin.get("symbol"),
+                farm,
+            )
         return 0
-    if force and extract_farm_reason(coin):
+    if not force and not is_held_runner(coin, time.time()):
         return 0
     mint = coin.get("mint") or ""
     n = 0
@@ -209,6 +218,16 @@ async def harvest(http: httpx.AsyncClient, state: State, coins: list[dict]) -> i
     for coin in coins:
         mint = coin.get("mint") or ""
         if not mint or mint in seen:
+            continue
+        seen.add(mint)
+        added += await harvest_coin(http, state, coin)
+    # Re-check books we already harvested. A UOTF-class farm that aged off
+    # last_trade still has to lose those wallets.
+    for mint in state.harvested_mints(40):
+        if mint in seen:
+            continue
+        coin = await fetch_coin(http, mint)
+        if not coin:
             continue
         seen.add(mint)
         added += await harvest_coin(http, state, coin)

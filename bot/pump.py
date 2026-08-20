@@ -80,6 +80,18 @@ async def active_coins(http: httpx.AsyncClient, limit: int = 80) -> list[dict]:
     return [normalize_coin(c) for c in data if c.get("mint")]
 
 
+async def market_cap_coins(http: httpx.AsyncClient, limit: int = 30) -> list[dict]:
+    """Highest MC books. One-way BOOST farms sit here; harvest uses it to drop them."""
+    url = (
+        f"{config.PUMP_API}/coins?offset=0&limit={limit}"
+        "&sort=market_cap&order=DESC&includeNsfw=false"
+    )
+    data = await get_json(http, url)
+    if not isinstance(data, list):
+        return []
+    return [normalize_coin(c) for c in data if c.get("mint")]
+
+
 async def graduated_coins(http: httpx.AsyncClient, limit: int = 25) -> list[dict]:
     """Newest bonding-curve fills. FISHBONE-class leaves `latest` after ~1m."""
     url = (

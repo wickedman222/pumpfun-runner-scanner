@@ -84,17 +84,35 @@ def is_token_promo(title: str) -> bool:
     return any(bit in t for bit in PROMO_BITS)
 
 
-def extract_farm_reason(coin: dict) -> str:
-    """Skip painted program books. The ticker spelling is never a reason.
+def _boost_on(coin: dict) -> bool:
+    mode = str(coin.get("boost_mode") or "NONE").upper()
+    return mode not in {"", "NONE", "NULL", "FALSE", "0", "OFF"}
 
-    Mayhem / cashback paint the tape. Copy-ticker floods are caught in the
-    engine. BOOST by itself is allowed — real books use it too.
+
+def extract_farm_reason(coin: dict) -> str:
+    """Skip painted program books. Chart, not the ticker letters.
+
+    UOTF/USWS/EYE: BOOST, ATH glued to spot at huge MC, empty room.
+    Real runners pull back a few percent even while they run (BULLBALLS ~8–40%).
     """
     mayhem = str(coin.get("mayhem_state") or "").upper()
     if mayhem and mayhem not in {"", "NONE", "NULL", "FALSE", "0", "OFF"}:
         return f"mayhem painted book ({mayhem})"
     if coin.get("is_cashback_enabled"):
         return "cashback painted book"
+    usd = float(coin.get("usd_market_cap") or 0)
+    ath = float(coin.get("ath_market_cap") or usd or 0)
+    replies = int(coin.get("reply_count") or 0)
+    live = bool(coin.get("is_currently_live"))
+    # One-way tape at harvest size: price never leaves ATH. That's the fake chart.
+    if (
+        _boost_on(coin)
+        and ath >= 200_000
+        and usd >= 0.985 * ath
+        and replies == 0
+        and not live
+    ):
+        return "one-way boost tape (ATH glued to spot)"
     return ""
 
 

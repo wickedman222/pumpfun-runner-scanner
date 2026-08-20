@@ -22,6 +22,7 @@ Every gate must pass. There is **no daily trade cap** — if several names hit t
 Never:
 
 - Mayhem or cashback painted books
+- One-way BOOST tape (ATH glued to spot from $200k up, empty room, not live) — fake chart, never harvest wallets from it
 - Copy-ticker farms (same ticker flooding — farm mechanic, not the letters)
 - First look already above ~$200k (just-graduated runners are allowed; $1M chases are not)
 - Serial-rug / bundled structure

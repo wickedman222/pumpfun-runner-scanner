@@ -474,6 +474,30 @@ class State:
             row = con.execute("SELECT 1 FROM tx_harvested WHERE mint = ?", (mint,)).fetchone()
         return bool(row)
 
+    def drop_wallets_from_mint(self, mint: str) -> int:
+        mint = (mint or "").strip()
+        if not mint:
+            return 0
+        with self._conn() as con:
+            cur = con.execute("DELETE FROM smart_wallet_mints WHERE mint = ?", (mint,))
+            n = cur.rowcount if cur.rowcount is not None else 0
+            con.execute("DELETE FROM tx_harvested WHERE mint = ?", (mint,))
+        return int(n)
+
+    def harvested_mints(self, limit: int = 40) -> list[str]:
+        with self._conn() as con:
+            rows = con.execute(
+                """
+                SELECT mint, MAX(seen_at) AS last_seen
+                FROM smart_wallet_mints
+                GROUP BY mint
+                ORDER BY last_seen DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [str(r["mint"]) for r in rows if r["mint"]]
+
     def mark_tx_harvested(self, mint: str) -> None:
         with self._conn() as con:
             con.execute(
