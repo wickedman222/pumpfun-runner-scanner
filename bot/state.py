@@ -44,6 +44,10 @@ CREATE TABLE IF NOT EXISTS smart_wallet_mints (
     PRIMARY KEY (wallet, mint)
 );
 CREATE INDEX IF NOT EXISTS idx_smart_wallet ON smart_wallet_mints(wallet);
+CREATE TABLE IF NOT EXISTS tx_harvested (
+    mint TEXT PRIMARY KEY,
+    seen_at INTEGER
+);
 CREATE TABLE IF NOT EXISTS tape (
     mint TEXT PRIMARY KEY,
     symbol TEXT,
@@ -145,6 +149,10 @@ class State:
                     PRIMARY KEY (wallet, mint)
                 );
                 CREATE INDEX IF NOT EXISTS idx_smart_wallet ON smart_wallet_mints(wallet);
+                CREATE TABLE IF NOT EXISTS tx_harvested (
+                    mint TEXT PRIMARY KEY,
+                    seen_at INTEGER
+                );
                 CREATE TABLE IF NOT EXISTS tape (
                     mint TEXT PRIMARY KEY,
                     symbol TEXT,
@@ -387,6 +395,18 @@ class State:
                     (wallet,),
                 ).fetchone()
         return int(row["n"] if row else 0)
+
+    def tx_harvested(self, mint: str) -> bool:
+        with self._conn() as con:
+            row = con.execute("SELECT 1 FROM tx_harvested WHERE mint = ?", (mint,)).fetchone()
+        return bool(row)
+
+    def mark_tx_harvested(self, mint: str) -> None:
+        with self._conn() as con:
+            con.execute(
+                "INSERT OR REPLACE INTO tx_harvested(mint, seen_at) VALUES (?,?)",
+                (mint, int(time.time())),
+            )
 
     def smart_wallet_count(self) -> int:
         with self._conn() as con:

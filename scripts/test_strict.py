@@ -132,6 +132,9 @@ st.note_smart_wallet("Wb", "mintA", 0.8)
 st.note_smart_wallet("Wb", "mintB", 0.8)
 assert st.smart_wallet_runners("Wa", exclude_mint="mintC") == 2
 assert st.smart_wallet_count() == 2
+assert not st.tx_harvested("mintA")
+st.mark_tx_harvested("mintA")
+assert st.tx_harvested("mintA")
 assert wallet_buy_ok(coin(4_000), now).startswith("thin")
 assert wallet_buy_ok(coin(25_000, ath=26_000), now) == ""
 

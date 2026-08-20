@@ -7,6 +7,7 @@ Buy a young book when two of those wallets are already sitting in it.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 
@@ -19,6 +20,17 @@ from .pump import age_seconds, normalize_coin
 from .state import State
 
 log = logging.getLogger("runner")
+
+_PROGRAMS = {
+    "11111111111111111111111111111111",
+    "ComputeBudget111111111111111111111111111111",
+    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+    "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "pAMMBay6oceH9fJKBRHGP5D4bD4sWftQeMjFwM6Uo",
+    "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMDkdrT4eFf4",
+}
 
 # Known recent runners to seed the book on first boot.
 SEED_RUNNERS = (
@@ -71,20 +83,104 @@ async def harvest_coin(
         return 0
     if force and extract_farm_reason(coin):
         return 0
-    holders = await fetch_holders(http, coin)
-    n = 0
     mint = coin.get("mint") or ""
-    for wallet, pct in holders[:15]:
+    n = 0
+    holders = await fetch_holders(http, coin)
+    for wallet, pct in holders[:20]:
         state.note_smart_wallet(wallet, mint, pct)
         n += 1
+    hidden = await harvest_early_buyers(http, state, coin)
+    n += hidden
     if n:
         log.info(
-            "Harvest %s %s holders from runner ATH $%s",
+            "Harvest %s %s wallets (%s still holding, %s early/hidden) ATH $%s",
             n,
             coin.get("symbol"),
+            len(holders[:20]),
+            hidden,
             f"{float(coin.get('ath_market_cap') or 0):,.0f}",
         )
     return n
+
+
+async def _rpc(http: httpx.AsyncClient, method: str, params: list) -> dict | None:
+    try:
+        r = await http.post(
+            config.SOLANA_RPC_URL,
+            json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
+            timeout=25.0,
+        )
+        if r.status_code != 200:
+            return None
+        return r.json()
+    except Exception:
+        return None
+
+
+def _pubkey(item) -> str:
+    if isinstance(item, dict):
+        return item.get("pubkey") or ""
+    return str(item or "")
+
+
+async def harvest_early_buyers(http: httpx.AsyncClient, state: State, coin: dict) -> int:
+    """Fee-payers who bought the curve early — often gone from the holder list."""
+    mint = coin.get("mint") or ""
+    curve = coin.get("bonding_curve") or ""
+    if not mint or not curve or state.tx_harvested(mint):
+        return 0
+    sigs_json = await _rpc(
+        http,
+        "getSignaturesForAddress",
+        [curve, {"limit": 24, "commitment": "confirmed"}],
+    )
+    rows = (sigs_json or {}).get("result") or []
+    sigs = [x.get("signature") for x in rows if x.get("signature")]
+    sigs = list(reversed(sigs))[:16]
+    skip = set(_PROGRAMS)
+    skip.add(curve)
+    skip.add(coin.get("associated_bonding_curve") or "")
+    skip.add(coin.get("pool_address") or "")
+    skip.add(coin.get("creator") or "")
+    seen: set[str] = set()
+    for sig in sigs:
+        await asyncio.sleep(0.12)
+        txj = await _rpc(
+            http,
+            "getTransaction",
+            [sig, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0}],
+        )
+        res = (txj or {}).get("result") or {}
+        meta = res.get("meta") or {}
+        if not res or meta.get("err"):
+            continue
+        keys = ((res.get("transaction") or {}).get("message") or {}).get("accountKeys") or []
+        payer = _pubkey(keys[0]) if keys else ""
+        if not payer or payer in skip or payer in seen:
+            continue
+        pre = {
+            b.get("owner"): b
+            for b in (meta.get("preTokenBalances") or [])
+            if b.get("mint") == mint
+        }
+        post = {
+            b.get("owner"): b
+            for b in (meta.get("postTokenBalances") or [])
+            if b.get("mint") == mint
+        }
+        bought = False
+        for owner, pb in post.items():
+            before = float(((pre.get(owner) or {}).get("uiTokenAmount") or {}).get("uiAmount") or 0)
+            after = float((pb.get("uiTokenAmount") or {}).get("uiAmount") or 0)
+            if after > before + 1:
+                bought = True
+                break
+        if not bought:
+            continue
+        seen.add(payer)
+        state.note_smart_wallet(payer, mint, 0.0)
+    state.mark_tx_harvested(mint)
+    return len(seen)
 
 
 async def top_runners(http: httpx.AsyncClient) -> list[dict]:
