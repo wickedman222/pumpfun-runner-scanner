@@ -47,6 +47,12 @@ uotf["reply_count"] = 0
 uotf["created_timestamp"] = int((now - 3600) * 1000)
 assert extract_farm_reason(uotf)
 assert not is_held_runner(uotf, now)
+wiggle = coin(134_400_000, ath=137_500_000, complete=True, mint="uotfWiggle", symbol="UOTF")
+wiggle["boost_mode"] = "COMPLETED"
+wiggle["reply_count"] = 0
+wiggle["created_timestamp"] = int((now - 3600) * 1000)
+assert extract_farm_reason(wiggle)
+assert not is_held_runner(wiggle, now)
 small = coin(930_000, ath=929_000, complete=True, mint="gptMint", symbol="ChatGPT")
 small["boost_mode"] = "COMPLETED"
 small["reply_count"] = 0
