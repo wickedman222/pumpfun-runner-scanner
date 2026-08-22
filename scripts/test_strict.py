@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from bot.attention import extract_farm_reason
 from bot.tape import decide
-from bot.wallets import harvest_coin, is_held_runner
+from bot.wallets import harvest_coin, is_held_runner, is_real_runner
 
 now = time.time()
 created_ms = int(now * 1000)
@@ -65,6 +65,12 @@ bull["reply_count"] = 0
 bull["created_timestamp"] = int((now - 3600) * 1000)
 assert not extract_farm_reason(bull), extract_farm_reason(bull)
 assert is_held_runner(bull, now)
+assert not is_real_runner(bull, now)
+organic = coin(480_000, ath=600_000, complete=True, mint="orgMint", symbol="HELD")
+organic["boost_mode"] = "NONE"
+organic["reply_count"] = 20
+organic["created_timestamp"] = int((now - 3600) * 1000)
+assert is_real_runner(organic, now)
 earn = coin(208_000, ath=258_000, complete=True, mint="earnMint", symbol="EARNBOT")
 earn["boost_mode"] = "COMPLETED"
 earn["reply_count"] = 0
@@ -155,6 +161,12 @@ async def _engine_paths() -> None:
         )
     v = await run(coin(22_000, mint="arm1", complete=False, ath=22_000))
     assert v.post is False and v.failed_gate == "watch", (v.failed_gate, v.fail_reason)
+
+    live_row = coin(22_000, mint="arm1", complete=False, ath=22_000)
+    live_row["is_currently_live"] = True
+    live_row["num_participants"] = 22
+    v = await run(live_row)
+    assert v.post is True and v.path == "live", (v.post, v.path, v.fail_reason)
 
 
 import asyncio

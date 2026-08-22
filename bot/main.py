@@ -15,7 +15,6 @@ from .pump import (
     graduated_coins,
     latest_coins,
     live_coins,
-    market_cap_coins,
 )
 from .state import State
 from .telegram import (
@@ -62,6 +61,15 @@ async def run() -> None:
             paper_reset = True
         paper_snap = paper.snapshot(state)
         health.STATUS["paper_equity"] = round(paper_snap["equity"], 4)
+    if state.get_meta("wallet_book") != config.WALLET_BOOK_ID:
+        dropped = state.clear_wallet_book()
+        state.set_meta("wallet_book", config.WALLET_BOOK_ID)
+        log.info(
+            "Cleared %s leftover wallets for book %s",
+            dropped,
+            config.WALLET_BOOK_ID,
+        )
+        health.STATUS["smart_wallets"] = 0
     attention = Attention()
     skip_logged: set[str] = set()
     last_attention = 0.0
@@ -88,7 +96,9 @@ async def run() -> None:
         except Exception as exc:
             log.warning("Initial attention refresh failed: %s", exc)
 
-        log.info("Scanner loop started. spot on-curve + follow wallets from held runners")
+        log.info(
+            "Scanner loop started. v2 buy = live room after hold, or 2 snipers, or tape+one more"
+        )
 
         while True:
             loop_start = time.time()
@@ -113,9 +123,8 @@ async def run() -> None:
                                 http, state, c, force=True
                             )
                     runners = await walletmod.top_runners(http)
-                    loud = await market_cap_coins(http, limit=30)
                     harvested += await walletmod.harvest(
-                        http, state, runners + trading + graduates + loud
+                        http, state, runners + trading + graduates
                     )
                     last_wallet_harvest = time.time()
                     health.STATUS["smart_wallets"] = state.smart_wallet_count()

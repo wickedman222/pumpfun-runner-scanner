@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 import httpx
 
 from . import config
-from .attention import Attention, Story
+from .attention import Attention, Story, extract_farm_reason
 from .pump import fetch_coin
 from .state import State
 from .structure import Structure, inspect
@@ -70,17 +70,6 @@ async def evaluate_new(
         elif "already $" in call.reason or "chase" in call.reason or "too far" in call.reason or "graduated" in call.reason:
             gate = "late"
         v.failed_gate = gate
-        if gate in {"farm", "age", "dumped"}:
-            state.mark_tape(mint, "skipped", call.reason)
-            return v
-        # late / first-mover: still allow wallet cluster (BULLBALLS was a later mint)
-        why = wallet_buy_ok(coin, time.time())
-        if why:
-            state.mark_tape(mint, "skipped", call.reason)
-            return v
-        wallet_call = await _maybe_wallet(http, state, coin, v)
-        if wallet_call:
-            return wallet_call
         state.mark_tape(mint, "skipped", call.reason)
         return v
 
@@ -93,50 +82,100 @@ async def evaluate_new(
             source="tape",
             seen_at=time.time(),
         )
-        wallet_call = await _maybe_wallet(http, state, coin, v)
-        return wallet_call or v
 
-    if call.action == "watch":
-        v.failed_gate = "watch"
-        wallet_call = await _maybe_wallet(http, state, coin, v)
-        return wallet_call or v
-
-    # Tape expansion is a watch, not a buy. Buy-in is runner-wallet cluster.
-    wallet_call = await _maybe_wallet(http, state, coin, v)
-    if wallet_call:
-        return wallet_call
-    v.failed_gate = "watch"
-    v.fail_reason = f"{call.reason} · waiting for runner wallets"
-    return v
+    row = state.upsert_tape(coin)
+    return await _maybe_buy(http, state, coin, v, call, row)
 
 
-async def _maybe_wallet(http: httpx.AsyncClient, state: State, coin: dict, v: Verdict) -> Verdict | None:
+def _live_ok(coin: dict, armed_mc: float) -> bool:
+    if not coin.get("is_currently_live"):
+        return False
+    if int(coin.get("num_participants") or 0) < config.MIN_LIVE_PARTICIPANTS:
+        return False
+    usd = float(coin.get("usd_market_cap") or 0)
+    ath = float(coin.get("ath_market_cap") or usd or 0)
+    if usd < config.MIN_LIVE_MC or usd > config.WALLET_MAX_BUY_MC:
+        return False
+    if ath > 0 and usd < ath * (1.0 - config.MAX_DD_AT_BUY):
+        return False
+    if coin.get("complete") and armed_mc <= 0:
+        return False
+    return True
+
+
+async def _maybe_buy(
+    http: httpx.AsyncClient,
+    state: State,
+    coin: dict,
+    v: Verdict,
+    call,
+    row: dict,
+) -> Verdict:
+    """Need two independent reasons. One wick is not a buy."""
+    usd = float(coin.get("usd_market_cap") or 0)
+    armed_mc = float(row.get("armed_mc") or 0)
+    armed_at = float(row.get("armed_at") or 0)
+    held = (time.time() - armed_at) if armed_at else 0.0
+    live_ok = _live_ok(coin, armed_mc)
+    tape_ready = call.action == "trigger"
+    live_held = live_ok and armed_mc > 0 and held >= config.MIN_ARM_HOLD_SEC
+
+    hits: list = []
     why = wallet_buy_ok(coin, time.time())
-    if why:
-        return None
-    hits = await wallet_overlap(http, state, coin)
-    if len(hits) < config.WALLET_MIN_OVERLAP:
-        return None
+    if not why:
+        hits = await wallet_overlap(http, state, coin)
+
+    score = 0
+    bits: list[str] = []
+    if tape_ready:
+        score += 1
+        bits.append(call.reason)
+    if live_held:
+        score += 2
+        bits.append(f"live {int(coin.get('num_participants') or 0)} in room")
+    elif live_ok:
+        score += 1
+        bits.append(f"live {int(coin.get('num_participants') or 0)}")
+    if len(hits) >= 1:
+        score += 1
+        bits.append(f"{len(hits)} sniper wallet(s)")
+    if len(hits) >= 2:
+        score += 1
+
+    if score < 2:
+        v.failed_gate = "watch"
+        v.fail_reason = (call.reason or "watching") + " · need live/snipers/hold"
+        return v
+
     if config.MAX_SIGNALS_PER_DAY > 0 and state.signals_today() >= config.MAX_SIGNALS_PER_DAY:
         v.failed_gate = "quota"
         v.fail_reason = "daily signal cap reached"
         return v
+
     structure = await inspect(http, coin)
     v.structure = structure
     if not structure.ok:
         v.failed_gate = "structure"
         v.fail_reason = "; ".join(structure.reasons_fail)
         return v
+
+    if len(hits) >= 2:
+        path = "wallet"
+    elif live_held or live_ok:
+        path = "live"
+    else:
+        path = "tape"
     names = ", ".join(f"{w[:6]}…×{n}" for w, _pct, n in hits[:4])
+    extra = f" ({names})" if names else ""
     v.post = True
-    v.path = "wallet"
-    v.match_score = 90
+    v.path = path
+    v.match_score = 50 + 20 * min(score, 4)
     v.failed_gate = ""
-    v.fail_reason = f"{len(hits)} runner wallets in book ({names})"
+    v.fail_reason = "; ".join(bits) + extra
     v.story = Story(
-        title=f"Wallet follow · {len(hits)} runner wallets already in",
+        title=f"Buy {path} · " + "; ".join(bits),
         url=coin.get("url") or "",
-        source="wallet",
+        source=path,
         seen_at=time.time(),
     )
     return v

@@ -1,8 +1,8 @@
-"""Follow wallets that showed up in recent held runners.
+"""Follow hidden early buyers from coins that actually ran.
 
-Pump.fun trade history is flaky; holder lists are not. Harvest top non-LP
-holders from coins that actually ran (ATH >= $200k, still near highs, <48h).
-Buy a young book when two of those wallets are already sitting in it.
+Leftover top holders are bags. The edge, if any, is fee-payers who bought
+the curve early on real runners (pullback, organic tape), then show up
+together in a young book.
 """
 
 from __future__ import annotations
@@ -76,6 +76,29 @@ def is_held_runner(coin: dict, now: float) -> bool:
     return True
 
 
+def is_real_runner(coin: dict, now: float) -> bool:
+    """Harvest source: actually ran, actually pulled back, not a painted tape."""
+    usd = float(coin.get("usd_market_cap") or 0)
+    ath = float(coin.get("ath_market_cap") or usd or 0)
+    if ath < config.RUNNER_MIN_ATH:
+        return False
+    age = age_seconds(coin, now)
+    if age <= 0 or age > config.RUNNER_MAX_AGE_SEC:
+        return False
+    if extract_farm_reason(coin):
+        return False
+    dd = _dd(usd, ath)
+    if dd < config.RUNNER_MIN_DD or dd > config.RUNNER_MAX_DD:
+        return False
+    replies = int(coin.get("reply_count") or 0)
+    live = bool(coin.get("is_currently_live"))
+    boost = str(coin.get("boost_mode") or "NONE").upper()
+    boost_on = boost not in {"", "NONE", "NULL", "FALSE", "0", "OFF"}
+    if not (live or replies >= 10 or not boost_on):
+        return False
+    return True
+
+
 async def harvest_coin(
     http: httpx.AsyncClient, state: State, coin: dict, force: bool = False
 ) -> int:
@@ -92,34 +115,18 @@ async def harvest_coin(
                 farm,
             )
         return 0
-    if not force and not is_held_runner(coin, time.time()):
+    if not force and not is_real_runner(coin, time.time()):
         return 0
-    usd = float(coin.get("usd_market_cap") or 0)
-    ath = float(coin.get("ath_market_cap") or usd or 0)
-    n = 0
-    holding_n = 0
-    # Leftover bags on a dumped book are not snipers. Hidden early buyers are.
-    take_holders = _dd(usd, ath) <= config.RUNNER_MAX_DD
-    holders: list[tuple[str, float]] = []
-    if take_holders:
-        holders = await fetch_holders(http, coin)
-        symbol = (coin.get("symbol") or "").upper()
-        for wallet, pct in holders[:20]:
-            state.note_smart_wallet(wallet, mint, pct, symbol=symbol, ath_mc=ath)
-            n += 1
-            holding_n += 1
+    ath = float(coin.get("ath_market_cap") or coin.get("usd_market_cap") or 0)
     hidden = await harvest_early_buyers(http, state, coin)
-    n += hidden
-    if n:
+    if hidden:
         log.info(
-            "Harvest %s %s wallets (%s still holding, %s early/hidden) ATH $%s",
-            n,
-            coin.get("symbol"),
-            holding_n,
+            "Harvest %s %s early/hidden wallets ATH $%s",
             hidden,
+            coin.get("symbol"),
             f"{ath:,.0f}",
         )
-    return n
+    return hidden
 
 
 async def _rpc(http: httpx.AsyncClient, method: str, params: list) -> dict | None:
@@ -243,12 +250,12 @@ async def harvest(http: httpx.AsyncClient, state: State, coins: list[dict]) -> i
 
 
 _holder_cache: dict[str, tuple[float, list[tuple[str, float]]]] = {}
-_overlap_left = 8
+_overlap_left = 16
 
 
 def reset_loop_budget() -> None:
     global _overlap_left
-    _overlap_left = 8
+    _overlap_left = 16
 
 
 async def fetch_holders(http: httpx.AsyncClient, coin: dict) -> list[tuple[str, float]]:
@@ -282,7 +289,7 @@ async def overlap(
     global _overlap_left
     if _overlap_left <= 0:
         return []
-    if state.smart_wallet_count() < 8:
+    if state.smart_wallet_count() < 4:
         return []
     _overlap_left -= 1
     holders = await fetch_holders(http, coin)
@@ -304,7 +311,7 @@ def wallet_buy_ok(coin: dict, now: float) -> str:
     usd = float(coin.get("usd_market_cap") or 0)
     ath = float(coin.get("ath_market_cap") or usd or 0)
     age = age_seconds(coin, now)
-    if age > config.MAX_ACTIVE_AGE_SEC:
+    if age > config.WALLET_MAX_AGE_SEC:
         return f"too old ({age/60:.0f}m)"
     if usd < config.MIN_ARM_MC:
         return f"thin book ${usd:,.0f}"

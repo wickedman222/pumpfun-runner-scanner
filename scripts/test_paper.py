@@ -33,17 +33,17 @@ def main() -> None:
     st = State(os.path.join(tmp, "t.db"))
     st.ensure_paper_wallet(2.0)
 
-    assert abs(buy_size(2.0) - 0.15) < 1e-9, buy_size(2.0)
-    assert abs(buy_size(2.0, 75_000) - 0.15) < 1e-9, buy_size(2.0, 75_000)
-    assert abs(buy_size(2.0, 120_000) - 0.105) < 1e-9, buy_size(2.0, 120_000)
+    assert abs(buy_size(2.0) - 0.12) < 1e-9, buy_size(2.0)
+    assert abs(buy_size(2.0, 40_000) - 0.12) < 1e-9, buy_size(2.0, 40_000)
+    assert abs(buy_size(2.0, 120_000) - 0.084) < 1e-9, buy_size(2.0, 120_000)
     assert buy_size(1.2) == 0.10
-    assert buy_size(4.0) == 0.20
+    assert buy_size(4.0) == 0.15
     assert buy_size(0.2) == 0.0
 
     fill = try_open(st, coin("m1", 20_000, symbol="SHOBON"), path="live")
     assert fill and fill.side == "buy"
     snap = snapshot(st)
-    assert abs(snap["cash"] - 1.85) < 1e-9, snap
+    assert abs(snap["cash"] - 1.88) < 1e-9, snap
     assert len(snap["open"]) == 1
 
     pos = st.paper_position("m1")

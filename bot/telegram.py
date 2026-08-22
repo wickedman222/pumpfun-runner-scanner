@@ -251,7 +251,7 @@ def format_wallet_follow(rep: dict) -> str:
             n = int(c.get("wallets") or 0)
             lines.append(f"${_esc(sym)}  {_esc(_wallet_x(ath))}  {n} wallets")
     lines.append(
-        "\n<i>Buy when 2 wallets that sat in $300k+ held runners show up in a young book.</i>"
+        "\n<i>Snipers = early curve buyers on real runs. Buy when 2 show up, or 1 plus a live room / held expansion.</i>"
     )
     return "\n".join(lines)
 
@@ -301,8 +301,8 @@ async def boot_message(
 ) -> None:
     text = (
         "<b>Pump.fun runner scanner online</b>\n"
-        "Spot on-curve, or follow wallets that sat in recent held runners.\n"
-        "Graduation fill is not a buy. No daily cap.\n"
+        "Buy only with two reasons: a live room that held, two snipers from real runners, or on-curve expansion plus one of those.\n"
+        "Graduation fill is not a buy.\n"
         f"Wallet book every {config.WALLET_REPORT_SEC // 3600}h · paper every {config.PAPER_REPORT_SEC // 3600}h"
     )
     if config.PAPER_ENABLED and snap:

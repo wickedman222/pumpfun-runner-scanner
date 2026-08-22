@@ -157,6 +157,10 @@ class State:
                     mint TEXT PRIMARY KEY,
                     seen_at INTEGER
                 );
+                CREATE TABLE IF NOT EXISTS meta (
+                    k TEXT PRIMARY KEY,
+                    v TEXT
+                );
                 CREATE TABLE IF NOT EXISTS tape (
                     mint TEXT PRIMARY KEY,
                     symbol TEXT,
@@ -480,6 +484,28 @@ class State:
         with self._conn() as con:
             row = con.execute("SELECT 1 FROM tx_harvested WHERE mint = ?", (mint,)).fetchone()
         return bool(row)
+
+    def get_meta(self, key: str, default: str = "") -> str:
+        with self._conn() as con:
+            row = con.execute("SELECT v FROM meta WHERE k = ?", (key,)).fetchone()
+        return str(row["v"]) if row and row["v"] is not None else default
+
+    def set_meta(self, key: str, value: str) -> None:
+        with self._conn() as con:
+            con.execute(
+                "INSERT INTO meta(k, v) VALUES (?,?) ON CONFLICT(k) DO UPDATE SET v = excluded.v",
+                (key, value),
+            )
+
+    def clear_wallet_book(self) -> int:
+        with self._conn() as con:
+            row = con.execute(
+                "SELECT COUNT(DISTINCT wallet) n FROM smart_wallet_mints"
+            ).fetchone()
+            n = int(row["n"] if row else 0)
+            con.execute("DELETE FROM smart_wallet_mints")
+            con.execute("DELETE FROM tx_harvested")
+        return n
 
     def drop_wallets_from_mint(self, mint: str) -> int:
         mint = (mint or "").strip()

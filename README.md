@@ -2,7 +2,7 @@
 
 Posts **only high-conviction Pump.fun candidates** to Telegram.
 
-Every new mint is scanned. **Spot** it on-curve in the $8k–$50k band. **Buy** only if that same mint is still near ATH, at least **+60% from our arm**, and at least **4 minutes** have passed. Graduation by itself is not a buy — that print is exit liquidity and is what slowly bled the paper book.
+Every new mint is scanned. **Spot** it on-curve in the $8k–$45k band. **Buy** only when two independent reasons line up: a live room that held, two early-buyer snipers from real runners, or on-curve expansion (+60% from our arm after 3 minutes) plus one of those. Graduation by itself is not a buy — that print is exit liquidity.
 
 No real-SOL trading. After a call it opens a **paper** position (starts at 2 SOL) and manages scale-outs / dead exits in Telegram.
 
@@ -14,10 +14,10 @@ Repo: [github.com/wickedman222/pumpfun-runner-scanner](https://github.com/wicked
 
 Every gate must pass. There is **no daily trade cap** — if several names hit the trigger, we take them (paper still max 5 open at once).
 
-1. **Spot** — every launch. Arm only on-curve, **$8k–$50k**, near ATH. First look already graduated is skipped.
-2. **Wait** — at least 4 minutes after the arm so a 12-second wick is not a buy.
-3. **Buy** — still within 25% of ATH, **+60% from our arm**, MC still under ~$120k. Structure only at buy.
-4. **Or wallet follow** — harvest **hidden early curve buyers** (and leftover holders only while the book is still held) from coins that actually ran (ATH ≥ $300k to count, still not a one-way BOOST tape). If **two** of those wallets are already in a young book, that is the buy. Leftover bags on a dumped chart do not count. Graduation fill is still not a buy.
+1. **Spot** — every launch. Arm only on-curve, **$8k–$45k**, near ATH. First look already graduated is skipped.
+2. **Wait** — at least 3 minutes after the arm so a wick is not a buy.
+3. **Buy** — two of: live room (≥15 people) that held, **two snipers** from real $300k+ runs, or **+60% from our arm** still within 25% of ATH under ~$80k. Structure only at buy.
+4. **Snipers** — early curve buyers from coins that actually ran (ATH ≥ $500k, pulled back 8–55%, not a one-way BOOST tape). Leftover bags are not harvested.
 
 Never:
 
@@ -63,7 +63,7 @@ Every 6 hours it also posts an **all-time top 15** of calls ranked by ATH multip
 
 ## Paper book
 
-Starts at **2 SOL** (not real). A call buys **7.5% of equity** (0.15 SOL at the start, floored at 0.10, capped at 0.20). Above $80k MC the size is 70% (still take the graduate). Hard skip only above ~$200k. Max **5** open. Fills assume 1% fee, 8% entry slip, 5% exit slip.
+Starts at **2 SOL** (not real). A call buys **6% of equity** (0.12 SOL at the start, floored at 0.10, capped at 0.15). Above $55k MC the size is 70%. Max **2** open. Fills assume 1% fee, 8% entry slip, 5% exit slip.
 
 | Level | Action |
 |---|---|
