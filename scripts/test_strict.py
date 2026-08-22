@@ -59,12 +59,18 @@ small["reply_count"] = 0
 small["created_timestamp"] = int((now - 3600) * 1000)
 assert extract_farm_reason(small)
 assert not is_held_runner(small, now)
-bull = coin(1_430_000, ath=1_560_000, complete=True, mint="bullMint", symbol="BULLBALLS")
+bull = coin(17_080_000, ath=27_975_000, complete=True, mint="bullMint", symbol="BULLBALLS")
 bull["boost_mode"] = "COMPLETED"
 bull["reply_count"] = 0
 bull["created_timestamp"] = int((now - 3600) * 1000)
 assert not extract_farm_reason(bull), extract_farm_reason(bull)
 assert is_held_runner(bull, now)
+earn = coin(208_000, ath=258_000, complete=True, mint="earnMint", symbol="EARNBOT")
+earn["boost_mode"] = "COMPLETED"
+earn["reply_count"] = 0
+earn["created_timestamp"] = int((now - 3600) * 1000)
+assert extract_farm_reason(earn)
+assert not is_held_runner(earn, now)
 live_boost = dict(uotf)
 live_boost["is_currently_live"] = True
 assert not extract_farm_reason(live_boost)
@@ -160,20 +166,24 @@ from bot.wallets import wallet_buy_ok
 
 tmp = tempfile.mkdtemp()
 st = State(os.path.join(tmp, "w.db"))
-st.note_smart_wallet("Wa", "mintA", 1.0, symbol="BULLBALLS", ath_mc=1_560_000)
+st.note_smart_wallet("Wa", "mintA", 1.0, symbol="BULLBALLS", ath_mc=27_975_000)
 st.note_smart_wallet("Wa", "mintB", 1.0, symbol="FISHBONE", ath_mc=350_000)
-st.note_smart_wallet("Wb", "mintA", 0.8, symbol="BULLBALLS", ath_mc=1_560_000)
+st.note_smart_wallet("Wb", "mintA", 0.8, symbol="BULLBALLS", ath_mc=27_975_000)
 st.note_smart_wallet("Wb", "mintB", 0.8, symbol="FISHBONE", ath_mc=350_000)
+st.note_smart_wallet("We", "earnMint", 1.0, symbol="EARNBOT", ath_mc=258_000)
 st.note_smart_wallet("Wf", "uotfMint", 2.0, symbol="UOTF", ath_mc=287_000_000)
 rep = st.wallet_report(5)
-assert rep["wallets"] == 3
+assert rep["wallets"] == 4
 assert "uotfMint" in st.harvested_mints()
 assert asyncio.run(harvest_coin(None, st, uotf)) == 0
+assert asyncio.run(harvest_coin(None, st, earn)) == 0
 assert st.smart_wallet_count() == 2
 assert "uotfMint" not in st.harvested_mints()
+assert "earnMint" not in st.harvested_mints()
 assert st.drop_wallets_from_mint("uotfMint") == 0
 assert any(r.get("symbol") == "BULLBALLS" for r in st.wallet_report(5)["top"][0]["runs"])
 assert st.smart_wallet_runners("Wa", exclude_mint="mintC") == 2
+assert st.smart_wallet_runners("We") == 0
 assert not st.tx_harvested("mintA")
 st.mark_tx_harvested("mintA")
 assert st.tx_harvested("mintA")

@@ -17,12 +17,12 @@ Every gate must pass. There is **no daily trade cap** — if several names hit t
 1. **Spot** — every launch. Arm only on-curve, **$8k–$50k**, near ATH. First look already graduated is skipped.
 2. **Wait** — at least 4 minutes after the arm so a 12-second wick is not a buy.
 3. **Buy** — still within 25% of ATH, **+60% from our arm**, MC still under ~$120k. Structure only at buy.
-4. **Or wallet follow** — harvest holders from recent coins that actually ran (ATH ≥ $200k, still near highs), **plus early curve buyers from on-chain txs** (the wallets that already sold and vanished from the holder list). If **two** of those wallets are already in a young book, that is the buy. Graduation fill is still not a buy.
+4. **Or wallet follow** — harvest **hidden early curve buyers** (and leftover holders only while the book is still held) from coins that actually ran (ATH ≥ $300k to count, still not a one-way BOOST tape). If **two** of those wallets are already in a young book, that is the buy. Leftover bags on a dumped chart do not count. Graduation fill is still not a buy.
 
 Never:
 
 - Mayhem or cashback painted books
-- One-way BOOST tape (within ~8% of ATH from $200k up, empty room, not live) — fake chart, never harvest wallets from it
+- One-way BOOST tape (within ~25% of ATH from $200k up, empty room, not live) — fake chart, never harvest wallets from it
 - Copy-ticker farms (same ticker flooding — farm mechanic, not the letters)
 - First look already above ~$200k (just-graduated runners are allowed; $1M chases are not)
 - Serial-rug / bundled structure

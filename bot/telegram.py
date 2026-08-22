@@ -250,7 +250,9 @@ def format_wallet_follow(rep: dict) -> str:
             ath = float(c.get("ath_mc") or 0)
             n = int(c.get("wallets") or 0)
             lines.append(f"${_esc(sym)}  {_esc(_wallet_x(ath))}  {n} wallets")
-    lines.append("\n<i>Buy when 2 of these show up in a young book near highs.</i>")
+    lines.append(
+        "\n<i>Buy when 2 wallets that sat in $300k+ held runners show up in a young book.</i>"
+    )
     return "\n".join(lines)
 
 

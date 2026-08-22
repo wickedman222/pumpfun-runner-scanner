@@ -104,12 +104,12 @@ def extract_farm_reason(coin: dict) -> str:
     ath = float(coin.get("ath_market_cap") or usd or 0)
     replies = int(coin.get("reply_count") or 0)
     live = bool(coin.get("is_currently_live"))
-    # One-way tape at harvest size: price never leaves ATH. Farms wiggle ~2%;
-    # real runners actually pull back (BULLBALLS ~8–40%).
+    # One-way tape: empty BOOST book that never actually dumped. Farms wiggle
+    # 0–20%. Real runners pull back hard (BULLBALLS ~39% off ATH).
     if (
         _boost_on(coin)
         and ath >= 200_000
-        and usd >= 0.92 * ath
+        and usd >= 0.75 * ath
         and replies == 0
         and not live
     ):

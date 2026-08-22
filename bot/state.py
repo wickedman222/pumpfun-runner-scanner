@@ -456,16 +456,23 @@ class State:
         wallet = (wallet or "").strip()
         if not wallet:
             return 0
+        min_ath = float(config.WALLET_MIN_SOURCE_ATH)
         with self._conn() as con:
             if exclude_mint:
                 row = con.execute(
-                    "SELECT COUNT(*) n FROM smart_wallet_mints WHERE wallet = ? AND mint != ?",
-                    (wallet, exclude_mint),
+                    """
+                    SELECT COUNT(*) n FROM smart_wallet_mints
+                    WHERE wallet = ? AND mint != ? AND COALESCE(ath_mc, 0) >= ?
+                    """,
+                    (wallet, exclude_mint, min_ath),
                 ).fetchone()
             else:
                 row = con.execute(
-                    "SELECT COUNT(*) n FROM smart_wallet_mints WHERE wallet = ?",
-                    (wallet,),
+                    """
+                    SELECT COUNT(*) n FROM smart_wallet_mints
+                    WHERE wallet = ? AND COALESCE(ath_mc, 0) >= ?
+                    """,
+                    (wallet, min_ath),
                 ).fetchone()
         return int(row["n"] if row else 0)
 

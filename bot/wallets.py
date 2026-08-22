@@ -79,9 +79,11 @@ def is_held_runner(coin: dict, now: float) -> bool:
 async def harvest_coin(
     http: httpx.AsyncClient, state: State, coin: dict, force: bool = False
 ) -> int:
+    mint = coin.get("mint") or ""
+    is_seed = mint in SEED_RUNNERS
     farm = extract_farm_reason(coin)
-    if farm:
-        dropped = state.drop_wallets_from_mint(coin.get("mint") or "")
+    if farm and not is_seed:
+        dropped = state.drop_wallets_from_mint(mint)
         if dropped:
             log.info(
                 "Drop %s farm wallets from %s (%s)",
@@ -92,14 +94,20 @@ async def harvest_coin(
         return 0
     if not force and not is_held_runner(coin, time.time()):
         return 0
-    mint = coin.get("mint") or ""
+    usd = float(coin.get("usd_market_cap") or 0)
+    ath = float(coin.get("ath_market_cap") or usd or 0)
     n = 0
-    holders = await fetch_holders(http, coin)
-    symbol = (coin.get("symbol") or "").upper()
-    ath = float(coin.get("ath_market_cap") or coin.get("usd_market_cap") or 0)
-    for wallet, pct in holders[:20]:
-        state.note_smart_wallet(wallet, mint, pct, symbol=symbol, ath_mc=ath)
-        n += 1
+    holding_n = 0
+    # Leftover bags on a dumped book are not snipers. Hidden early buyers are.
+    take_holders = _dd(usd, ath) <= config.RUNNER_MAX_DD
+    holders: list[tuple[str, float]] = []
+    if take_holders:
+        holders = await fetch_holders(http, coin)
+        symbol = (coin.get("symbol") or "").upper()
+        for wallet, pct in holders[:20]:
+            state.note_smart_wallet(wallet, mint, pct, symbol=symbol, ath_mc=ath)
+            n += 1
+            holding_n += 1
     hidden = await harvest_early_buyers(http, state, coin)
     n += hidden
     if n:
@@ -107,9 +115,9 @@ async def harvest_coin(
             "Harvest %s %s wallets (%s still holding, %s early/hidden) ATH $%s",
             n,
             coin.get("symbol"),
-            len(holders[:20]),
+            holding_n,
             hidden,
-            f"{float(coin.get('ath_market_cap') or 0):,.0f}",
+            f"{ath:,.0f}",
         )
     return n
 
