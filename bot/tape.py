@@ -1,11 +1,7 @@
-"""Spot every launch. Buy only confirmed strength — never the graduation fill.
+"""Spot on-curve. Buy expansion. Never the graduation fill.
 
-Overnight book died because we bought `first print $X · graduated`. That is
-the curve fill. Explore runners are the ones that *held and kept going*.
-
-Spot: see it on-curve in the $8k–$50k band, near ATH.
-Buy: still near ATH, +60% from *our* arm, at least 4 minutes later,
-still under the chase line. Graduation alone is never a buy.
+Live rooms and leftover wallets were traps. The only thing we can actually
+see in time is: we armed this mint on-curve, then it kept going near ATH.
 """
 
 from __future__ import annotations
@@ -68,13 +64,6 @@ def decide(coin: dict, row: dict, *, older: dict | None, copies: int, now: float
         return Call("arm", f"on-curve first print ${usd:,.0f}", armed_mc=usd)
 
     held = (now - armed_at) if armed_at else 0.0
-    if held < config.MIN_ARM_HOLD_SEC:
-        return Call(
-            "watch",
-            f"armed ${armed_mc:,.0f} now ${usd:,.0f} · waiting {config.MIN_ARM_HOLD_SEC - held:.0f}s",
-            armed_mc=armed_mc,
-        )
-
     if usd > config.MAX_FIRST_LOOK_MC:
         return Call("skip", f"chase ${usd:,.0f}", armed_mc=armed_mc)
     if _dd(usd, ath) > config.MAX_DD_AT_BUY:
@@ -84,14 +73,36 @@ def decide(coin: dict, row: dict, *, older: dict | None, copies: int, now: float
             armed_mc=armed_mc,
         )
     if usd < config.MIN_BUY_MC:
+        if held < config.MIN_ARM_HOLD_SEC:
+            return Call(
+                "watch",
+                f"armed ${armed_mc:,.0f} now ${usd:,.0f} · waiting {config.MIN_ARM_HOLD_SEC - held:.0f}s",
+                armed_mc=armed_mc,
+            )
         return Call("watch", f"armed ${armed_mc:,.0f} now ${usd:,.0f}", armed_mc=armed_mc)
 
-    expanded = usd >= armed_mc * config.EXPANSION_MULT
-    if not expanded:
-        return Call("watch", f"armed ${armed_mc:,.0f} now ${usd:,.0f}", armed_mc=armed_mc)
-
-    return Call(
-        "trigger",
-        f"held {held/60:.1f}m · ${armed_mc:,.0f}→${usd:,.0f} · dd {_dd(usd, ath)*100:.0f}%",
-        armed_mc=armed_mc,
-    )
+    dd = _dd(usd, ath)
+    # Fast rip: two+ polls, still glued to highs, +40% from our arm.
+    if (
+        held >= config.FAST_HOLD_SEC
+        and usd >= armed_mc * config.FAST_MULT
+        and dd <= 0.20
+    ):
+        return Call(
+            "trigger",
+            f"rip {held:.0f}s · ${armed_mc:,.0f}→${usd:,.0f} · dd {dd*100:.0f}%",
+            armed_mc=armed_mc,
+        )
+    if held < config.MIN_ARM_HOLD_SEC:
+        return Call(
+            "watch",
+            f"armed ${armed_mc:,.0f} now ${usd:,.0f} · waiting {config.MIN_ARM_HOLD_SEC - held:.0f}s",
+            armed_mc=armed_mc,
+        )
+    if usd >= armed_mc * config.EXPANSION_MULT:
+        return Call(
+            "trigger",
+            f"held {held/60:.1f}m · ${armed_mc:,.0f}→${usd:,.0f} · dd {dd*100:.0f}%",
+            armed_mc=armed_mc,
+        )
+    return Call("watch", f"armed ${armed_mc:,.0f} now ${usd:,.0f}", armed_mc=armed_mc)

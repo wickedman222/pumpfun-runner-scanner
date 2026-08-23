@@ -76,7 +76,7 @@ SOLANA_RPC_URL = _env(
 )
 
 # --- Timing ---
-PUMP_POLL_SEC = _int("PUMP_POLL_SEC", 12)
+PUMP_POLL_SEC = _int("PUMP_POLL_SEC", 8)
 ATTENTION_POLL_SEC = _int("ATTENTION_POLL_SEC", 120)
 EXPANSION_WAIT_SEC = _int("EXPANSION_WAIT_SEC", 180)
 # Keep the watch after the first check. FISHBONE pulled back for ~8m then ran.
@@ -90,10 +90,12 @@ MIN_LIVE_PARTICIPANTS = _int("MIN_LIVE_PARTICIPANTS", 15)
 MIN_LIVE_MC = _float("MIN_LIVE_MC", 8_000)
 # Spot on-curve early. Buy confirmed strength. Graduation alone is not a buy.
 MIN_ARM_MC = _float("MIN_ARM_MC", 8_000)
-MAX_ARM_MC = _float("MAX_ARM_MC", 45_000)
+MAX_ARM_MC = _float("MAX_ARM_MC", 50_000)
 MIN_TAPE_MC = _float("MIN_TAPE_MC", MIN_ARM_MC)
-MIN_BUY_MC = _float("MIN_BUY_MC", 16_000)
+MIN_BUY_MC = _float("MIN_BUY_MC", 14_000)
 MIN_ARM_HOLD_SEC = _int("MIN_ARM_HOLD_SEC", 180)
+FAST_HOLD_SEC = _int("FAST_HOLD_SEC", 24)
+FAST_MULT = _float("FAST_MULT", 1.40)
 MAX_DD_AT_BUY = _float("MAX_DD_AT_BUY", 0.25)
 GRADUATE_CONFIRM_MC = _float("GRADUATE_CONFIRM_MC", 60_000)
 EXPANSION_MULT = _float("EXPANSION_MULT", 1.60)
@@ -102,7 +104,7 @@ TAPE_REFRESH_LIMIT = _int("TAPE_REFRESH_LIMIT", 50)
 MAX_SIGNALS_PER_DAY = _int("MAX_SIGNALS_PER_DAY", 0)
 # Only posts stamped with this id count toward the daily cap.
 # Bump when the strat changes so leftover rows from an old loop do not sit us out.
-SIGNAL_BOOK_ID = _env("SIGNAL_BOOK_ID", "v2-1")
+SIGNAL_BOOK_ID = _env("SIGNAL_BOOK_ID", "v3-spot")
 MIN_MATCH_SCORE = _int("MIN_MATCH_SCORE", 100)
 LEADERBOARD_SEC = _int("LEADERBOARD_SEC", 6 * 3600)
 LEADERBOARD_SIZE = _int("LEADERBOARD_SIZE", 15)
@@ -141,7 +143,7 @@ WALLET_MAX_AGE_SEC = _int("WALLET_MAX_AGE_SEC", 90 * 60)
 WALLET_BOOK_ID = _env("WALLET_BOOK_ID", "v2-1")
 
 # --- Paper book (no real SOL) ---
-PAPER_ENABLED = _int("PAPER_ENABLED", 1) == 1
+PAPER_ENABLED = _int("PAPER_ENABLED", 0) == 1
 PAPER_START_SOL = _float("PAPER_START_SOL", 2.0)
 # Bump this string to flatten the paper book and start from PAPER_START_SOL again.
 PAPER_BOOK_ID = _env("PAPER_BOOK_ID", "v2-1")

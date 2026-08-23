@@ -97,7 +97,7 @@ async def run() -> None:
             log.warning("Initial attention refresh failed: %s", exc)
 
         log.info(
-            "Scanner loop started. v2 buy = live room after hold, or 2 snipers, or tape+one more"
+            "Scanner loop started. paper OFF. spot on-curve, post expansion near ATH"
         )
 
         while True:

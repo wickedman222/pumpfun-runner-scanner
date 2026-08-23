@@ -2,7 +2,7 @@
 
 Posts **only high-conviction Pump.fun candidates** to Telegram.
 
-Every new mint is scanned. **Spot** it on-curve in the $8k–$45k band. **Buy** only when two independent reasons line up: a live room that held, two early-buyer snipers from real runners, or on-curve expansion (+60% from our arm after 3 minutes) plus one of those. Graduation by itself is not a buy — that print is exit liquidity.
+Every new mint is scanned. **Spot** it on-curve in the $8k–$50k band. **Post** when that same mint is still near ATH and has either ripped (+40% within ~24s) or held (+60% after 3 minutes). Graduation by itself is not a buy. Paper is off until this actually catches real books.
 
 No real-SOL trading. After a call it opens a **paper** position (starts at 2 SOL) and manages scale-outs / dead exits in Telegram.
 
@@ -14,10 +14,10 @@ Repo: [github.com/wickedman222/pumpfun-runner-scanner](https://github.com/wicked
 
 Every gate must pass. There is **no daily trade cap** — if several names hit the trigger, we take them (paper still max 5 open at once).
 
-1. **Spot** — every launch. Arm only on-curve, **$8k–$45k**, near ATH. First look already graduated is skipped.
-2. **Wait** — at least 3 minutes after the arm so a wick is not a buy.
-3. **Buy** — two of: live room (≥15 people) that held, **two snipers** from real $300k+ runs, or **+60% from our arm** still within 25% of ATH under ~$80k. Structure only at buy.
-4. **Snipers** — early curve buyers from coins that actually ran (ATH ≥ $500k, pulled back 8–55%, not a one-way BOOST tape). Leftover bags are not harvested.
+1. **Spot** — every launch. Arm only on-curve, **$8k–$50k**, near ATH. First look already graduated is skipped.
+2. **Rip** — two+ polls later, still near ATH, **+40% from our arm**.
+3. **Or hold** — 3 minutes later, still near ATH, **+60% from our arm**, MC under ~$80k. Structure only at post.
+4. Painted BOOST / mayhem / cashback tapes are skipped. Live-room-only is not a buy.
 
 Never:
 

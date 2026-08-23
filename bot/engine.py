@@ -12,7 +12,6 @@ from .pump import fetch_coin
 from .state import State
 from .structure import Structure, inspect
 from .tape import decide as tape_decide
-from .wallets import overlap as wallet_overlap, wallet_buy_ok
 
 log = logging.getLogger("runner")
 
@@ -83,68 +82,8 @@ async def evaluate_new(
             seen_at=time.time(),
         )
 
-    row = state.upsert_tape(coin)
-    return await _maybe_buy(http, state, coin, v, call, row)
-
-
-def _live_ok(coin: dict, armed_mc: float) -> bool:
-    if not coin.get("is_currently_live"):
-        return False
-    if int(coin.get("num_participants") or 0) < config.MIN_LIVE_PARTICIPANTS:
-        return False
-    usd = float(coin.get("usd_market_cap") or 0)
-    ath = float(coin.get("ath_market_cap") or usd or 0)
-    if usd < config.MIN_LIVE_MC or usd > config.WALLET_MAX_BUY_MC:
-        return False
-    if ath > 0 and usd < ath * (1.0 - config.MAX_DD_AT_BUY):
-        return False
-    if coin.get("complete") and armed_mc <= 0:
-        return False
-    return True
-
-
-async def _maybe_buy(
-    http: httpx.AsyncClient,
-    state: State,
-    coin: dict,
-    v: Verdict,
-    call,
-    row: dict,
-) -> Verdict:
-    """Need two independent reasons. One wick is not a buy."""
-    usd = float(coin.get("usd_market_cap") or 0)
-    armed_mc = float(row.get("armed_mc") or 0)
-    armed_at = float(row.get("armed_at") or 0)
-    held = (time.time() - armed_at) if armed_at else 0.0
-    live_ok = _live_ok(coin, armed_mc)
-    tape_ready = call.action == "trigger"
-    live_held = live_ok and armed_mc > 0 and held >= config.MIN_ARM_HOLD_SEC
-
-    hits: list = []
-    why = wallet_buy_ok(coin, time.time())
-    if not why:
-        hits = await wallet_overlap(http, state, coin)
-
-    score = 0
-    bits: list[str] = []
-    if tape_ready:
-        score += 1
-        bits.append(call.reason)
-    if live_held:
-        score += 2
-        bits.append(f"live {int(coin.get('num_participants') or 0)} in room")
-    elif live_ok:
-        score += 1
-        bits.append(f"live {int(coin.get('num_participants') or 0)}")
-    if len(hits) >= 1:
-        score += 1
-        bits.append(f"{len(hits)} sniper wallet(s)")
-    if len(hits) >= 2:
-        score += 1
-
-    if score < 2:
+    if call.action != "trigger":
         v.failed_gate = "watch"
-        v.fail_reason = (call.reason or "watching") + " · need live/snipers/hold"
         return v
 
     if config.MAX_SIGNALS_PER_DAY > 0 and state.signals_today() >= config.MAX_SIGNALS_PER_DAY:
@@ -159,23 +98,15 @@ async def _maybe_buy(
         v.fail_reason = "; ".join(structure.reasons_fail)
         return v
 
-    if len(hits) >= 2:
-        path = "wallet"
-    elif live_held or live_ok:
-        path = "live"
-    else:
-        path = "tape"
-    names = ", ".join(f"{w[:6]}…×{n}" for w, _pct, n in hits[:4])
-    extra = f" ({names})" if names else ""
     v.post = True
-    v.path = path
-    v.match_score = 50 + 20 * min(score, 4)
+    v.path = "tape"
+    v.match_score = 80
     v.failed_gate = ""
-    v.fail_reason = "; ".join(bits) + extra
+    v.fail_reason = call.reason
     v.story = Story(
-        title=f"Buy {path} · " + "; ".join(bits),
+        title=call.reason,
         url=coin.get("url") or "",
-        source=path,
+        source="tape",
         seen_at=time.time(),
     )
     return v

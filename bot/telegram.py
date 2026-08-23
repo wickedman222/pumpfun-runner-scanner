@@ -301,9 +301,9 @@ async def boot_message(
 ) -> None:
     text = (
         "<b>Pump.fun runner scanner online</b>\n"
-        "Buy only with two reasons: a live room that held, two snipers from real runners, or on-curve expansion plus one of those.\n"
-        "Graduation fill is not a buy.\n"
-        f"Wallet book every {config.WALLET_REPORT_SEC // 3600}h · paper every {config.PAPER_REPORT_SEC // 3600}h"
+        "Spot on-curve, post when that same mint expands near ATH. Graduation fill is not a buy.\n"
+        "Paper is off — spotting only.\n"
+        f"Wallet book every {config.WALLET_REPORT_SEC // 3600}h"
     )
     if config.PAPER_ENABLED and snap:
         if reset:

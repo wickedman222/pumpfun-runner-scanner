@@ -101,12 +101,17 @@ c = decide(coin(12_000), row0, older=None, copies=0, now=now)
 assert c.action == "arm", c
 assert c.armed_mc == 12_000
 
-# Same mint 30s later at 2x — still waiting hold time.
-armed = {"armed_mc": 12_000, "armed_at": now - 30}
+# One poll later even at 2x — still waiting.
+armed = {"armed_mc": 12_000, "armed_at": now - 10}
 c = decide(coin(24_000), armed, older=None, copies=0, now=now)
 assert c.action == "watch" and "waiting" in c.reason, c
 
-# 5 min later, +60%, near ATH — BUY.
+# Two+ polls, +40% near ATH — rip.
+armed = {"armed_mc": 12_000, "armed_at": now - 30}
+c = decide(coin(24_000, ath=24_000), armed, older=None, copies=0, now=now)
+assert c.action == "trigger" and "rip" in c.reason, c
+
+# 5 min later, +60%, near ATH — held expansion.
 armed = {"armed_mc": 12_000, "armed_at": now - 300}
 c = decide(coin(22_000, ath=22_000), armed, older=None, copies=0, now=now)
 assert c.action == "trigger", c
@@ -160,13 +165,19 @@ async def _engine_paths() -> None:
             (int(time.time()) - 400, "arm1"),
         )
     v = await run(coin(22_000, mint="arm1", complete=False, ath=22_000))
-    assert v.post is False and v.failed_gate == "watch", (v.failed_gate, v.fail_reason)
+    assert v.post is True and v.path == "tape", (v.post, v.path, v.fail_reason)
 
-    live_row = coin(22_000, mint="arm1", complete=False, ath=22_000)
+    v = await run(coin(12_000, mint="arm2", complete=False))
+    with st._conn() as con:
+        con.execute(
+            "UPDATE tape SET armed_at = ? WHERE mint = ?",
+            (int(time.time()) - 200, "arm2"),
+        )
+    live_row = coin(15_000, mint="arm2", complete=False, ath=15_000)
     live_row["is_currently_live"] = True
     live_row["num_participants"] = 22
     v = await run(live_row)
-    assert v.post is True and v.path == "live", (v.post, v.path, v.fail_reason)
+    assert v.post is False, (v.post, v.path, v.fail_reason)
 
 
 import asyncio
