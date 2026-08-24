@@ -293,30 +293,54 @@ def mark_sol(pos: dict) -> float:
     return qty * (last / entry)
 
 
-async def boot_message(
-    http: httpx.AsyncClient,
-    signals_today: int = 0,
-    snap: dict | None = None,
-    reset: bool = False,
-) -> None:
-    text = (
-        "<b>Pump.fun runner scanner online</b>\n"
-        "Spot on-curve, post when that same mint expands near ATH. Graduation fill is not a buy.\n"
-        "Paper is off — spotting only.\n"
-        f"Wallet book every {config.WALLET_REPORT_SEC // 3600}h"
-    )
-    if config.PAPER_ENABLED and snap:
-        if reset:
-            text += f"\n\n<b>Paper book was reset to {config.PAPER_START_SOL:.2f} SOL</b> — not real fills."
-        text += "\n\n" + format_paper_book(snap)
-    elif config.PAPER_ENABLED:
-        text += (
-            f"\n\nPaper on · size {config.PAPER_SIZE_FRAC * 100:.1f}% "
-            f"({config.PAPER_SIZE_MIN:.2f}–{config.PAPER_SIZE_MAX:.2f}) · "
-            f"max {config.PAPER_MAX_OPEN} open. Not a reset."
-        )
-    ok = await send(http, text)
-    if ok:
-        log.info("Boot message sent to %s", config.TELEGRAM_CHAT_ID)
+def format_gather(rep: dict, hours: int = 6) -> str:
+    """One dump of what we actually saw. No boot/candidate/paper fluff."""
+
+    def _x(num: float, den: float) -> str:
+        if den <= 0 or num <= 0:
+            return "—"
+        return _fmt_x(num / den)
+
+    def _name(row: dict) -> str:
+        symbol = _esc(row.get("symbol") or "?")
+        url = row.get("url") or ""
+        if url:
+            return f"<a href=\"{_esc(url)}\">${symbol}</a>"
+        mint = row.get("mint") or ""
+        if mint:
+            return f"<a href=\"https://pump.fun/coin/{_esc(mint)}\">${symbol}</a>"
+        return f"${symbol}"
+
+    spots = rep.get("spots") or []
+    armed = rep.get("armed") or []
+    lines = [
+        f"<b>{hours}h gather</b>",
+        f"spots {len(spots)} · armed {len(armed)} · skipped {rep.get('skip_n') or 0} · farm {rep.get('farm_n') or 0}",
+        "",
+    ]
+    if spots:
+        lines.append("<b>spots</b>  arm → now (ATH)")
+        for row in spots[:15]:
+            entry = float(row.get("entry_mc") or 0)
+            last = float(row.get("last_mc") or 0)
+            ath = float(row.get("ath_mc") or last)
+            story = (row.get("story") or "").strip()
+            bit = f"  {_esc(story)}" if story else ""
+            lines.append(
+                f"• {_name(row)}  {_esc(_fmt_usd(entry))} → {_esc(_fmt_usd(last))}  "
+                f"<b>{_esc(_x(ath, entry))}</b> ATH{_esc(bit)}"
+            )
     else:
-        log.error("Boot message failed — check TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID")
+        lines.append("no expansion spots this window")
+    live_armed = [r for r in armed if float(r.get("last_mc") or 0) > 0]
+    if live_armed:
+        lines += ["", "<b>armed, no expansion yet</b>"]
+        for row in live_armed[:12]:
+            arm = float(row.get("armed_mc") or 0)
+            last = float(row.get("last_mc") or 0)
+            ath = float(row.get("ath_mc") or last)
+            lines.append(
+                f"• {_name(row)}  {_esc(_fmt_usd(arm))} → {_esc(_fmt_usd(last))}  "
+                f"{_esc(_x(last, arm))} now / {_esc(_x(ath, arm))} ATH"
+            )
+    return "\n".join(lines)

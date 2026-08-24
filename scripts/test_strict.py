@@ -214,4 +214,37 @@ assert wallet_buy_ok(coin(4_000), now).startswith("thin")
 assert wallet_buy_ok(coin(25_000, ath=26_000), now) == ""
 assert "boost" in wallet_buy_ok(uotf, now)
 
+from bot.telegram import format_gather
+
+g = format_gather(
+    {
+        "spots": [
+            {
+                "symbol": "FOO",
+                "url": "https://pump.fun/coin/m",
+                "entry_mc": 12_000,
+                "last_mc": 48_000,
+                "ath_mc": 52_000,
+                "story": "rip 24s",
+            }
+        ],
+        "armed": [
+            {
+                "symbol": "BAR",
+                "mint": "mintbar",
+                "armed_mc": 10_000,
+                "last_mc": 11_000,
+                "ath_mc": 12_000,
+            }
+        ],
+        "skip_n": 40,
+        "farm_n": 12,
+    },
+    6,
+)
+assert "6h gather" in g
+assert "$FOO" in g
+assert "4.3x" in g or "4.33x" in g
+assert "no live TG" not in g
+
 print("strict buy rules ok")

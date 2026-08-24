@@ -346,14 +346,59 @@ class State:
             rows = con.execute(
                 """
                 SELECT * FROM tape
-                WHERE created_ts >= ? AND status IN ('watching', 'armed')
-                ORDER BY CASE status WHEN 'armed' THEN 0 ELSE 1 END,
-                         last_seen_at ASC
+                WHERE last_seen_at >= ?
+                  AND status IN ('watching', 'armed', 'triggered')
+                ORDER BY CASE status
+                    WHEN 'triggered' THEN 0
+                    WHEN 'armed' THEN 1
+                    ELSE 2 END,
+                    last_seen_at ASC
                 LIMIT ?
                 """,
                 (cutoff, limit),
             ).fetchall()
         return [dict(r) for r in rows]
+
+    def gather_since(self, since: int) -> dict:
+        with self._conn() as con:
+            spots = con.execute(
+                """
+                SELECT * FROM posted
+                WHERE posted_at >= ? AND book_id = ?
+                ORDER BY CASE WHEN entry_mc > 0 THEN ath_mc / entry_mc ELSE 0 END DESC
+                """,
+                (since, config.SIGNAL_BOOK_ID),
+            ).fetchall()
+            armed = con.execute(
+                """
+                SELECT * FROM tape
+                WHERE armed_at >= ? AND armed_mc > 0 AND status IN ('armed', 'watching')
+                ORDER BY CASE WHEN armed_mc > 0 THEN last_mc / armed_mc ELSE 0 END DESC
+                LIMIT 20
+                """,
+                (since,),
+            ).fetchall()
+            farm_n = con.execute(
+                """
+                SELECT COUNT(*) n FROM tape
+                WHERE first_seen_at >= ? AND status = 'skipped'
+                  AND skip_reason LIKE '%farm%'
+                """,
+                (since,),
+            ).fetchone()["n"]
+            skip_n = con.execute(
+                """
+                SELECT COUNT(*) n FROM tape
+                WHERE first_seen_at >= ? AND status = 'skipped'
+                """,
+                (since,),
+            ).fetchone()["n"]
+        return {
+            "spots": [dict(r) for r in spots],
+            "armed": [dict(r) for r in armed],
+            "farm_n": int(farm_n or 0),
+            "skip_n": int(skip_n or 0),
+        }
 
     def tape_stats(self) -> dict:
         cutoff = int(time.time()) - config.MAX_ACTIVE_AGE_SEC

@@ -17,15 +17,7 @@ from .pump import (
     live_coins,
 )
 from .state import State
-from .telegram import (
-    boot_message,
-    format_leaderboard,
-    format_paper_book,
-    format_paper_fill,
-    format_signal,
-    format_wallet_follow,
-    send,
-)
+from .telegram import format_gather, format_paper_book, format_paper_fill, send
 
 # Railway paints stderr red. Keep INFO on stdout so the dashboard stays white.
 logging.basicConfig(
@@ -73,22 +65,15 @@ async def run() -> None:
     attention = Attention()
     skip_logged: set[str] = set()
     last_attention = 0.0
-    last_leaderboard = time.time()
     last_paper_report = time.time()
     last_feed_log = 0.0
     last_wallet_harvest = 0.0
-    last_wallet_report = 0.0
+    last_gather_report = time.time()
 
     health.STATUS["ok"] = True
     health.start(config.PORT)
 
     async with client() as http:
-        await boot_message(
-            http,
-            signals_today=state.signals_today(),
-            snap=paper_snap,
-            reset=paper_reset,
-        )
         try:
             await attention.refresh(http)
             last_attention = time.time()
@@ -97,7 +82,7 @@ async def run() -> None:
             log.warning("Initial attention refresh failed: %s", exc)
 
         log.info(
-            "Scanner loop started. paper OFF. spot on-curve, post expansion near ATH"
+            "Scanner loop started. paper OFF. no live TG except 6h gather dump"
         )
 
         while True:
@@ -177,7 +162,7 @@ async def run() -> None:
                     usd = float(coin.get("usd_market_cap") or 0)
                     notable = usd >= config.MIN_ARM_MC
                     if verdict.post:
-                        await _emit_buy(http, state, verdict)
+                        await _note_spot(state, verdict)
                         continue
                     if verdict.failed_gate == "watch":
                         if verdict.story and str(verdict.story.title).startswith("Armed"):
@@ -204,13 +189,9 @@ async def run() -> None:
                         await _send_paper_report(http, state)
                         last_paper_report = time.time()
 
-                if time.time() - last_leaderboard >= config.LEADERBOARD_SEC:
-                    await _send_leaderboard(http, state, attention, health.STATUS.get("seen", 0))
-                    last_leaderboard = time.time()
-
-                if time.time() - last_wallet_report >= config.WALLET_REPORT_SEC:
-                    await _send_wallet_report(http, state)
-                    last_wallet_report = time.time()
+                if time.time() - last_gather_report >= config.WALLET_REPORT_SEC:
+                    await _send_gather(http, state)
+                    last_gather_report = time.time()
 
                 health.STATUS["last_error"] = ""
             except Exception as exc:
@@ -253,46 +234,20 @@ async def _refresh_tracked(http, state: State) -> list[dict]:
     return out
 
 
-async def _emit_buy(http, state: State, verdict) -> None:
+async def _note_spot(state: State, verdict) -> None:
     coin = verdict.coin
     why = verdict.fail_reason or (verdict.story.title if verdict.story else "tape")
-    text = format_signal(verdict, why)
-    sent = await send(http, text, preview=True)
-    if not sent:
-        log.error("Failed to post %s", coin.get("symbol"))
-        return
-    story_title = getattr(verdict.story, "title", "") or ""
+    story_title = getattr(verdict.story, "title", "") or why
     state.mark_posted(coin, story_title)
     state.mark_tape(coin.get("mint") or "", "triggered", why)
     health.STATUS["posted"] = len(state.list_posted())
-    log.info("POSTED %s — %s", coin.get("symbol"), why)
-    if not config.PAPER_ENABLED:
-        return
-    fill = paper.try_open(state, coin, verdict.path or "tape")
-    if not fill:
-        return
-    snap = paper.snapshot(state)
-    health.STATUS["paper_equity"] = round(snap["equity"], 4)
-    await send(http, format_paper_fill(fill, snap), preview=True)
+    log.info("SPOT %s — %s", coin.get("symbol"), why)
 
 
-async def _send_wallet_report(http, state: State) -> None:
-    rep = state.wallet_report(config.WALLET_REPORT_SIZE)
-    text = format_wallet_follow(rep)
-    ok = await send(http, text)
-    if ok:
-        log.info(
-            "Wallet follow report sent (%s wallets, %s mints)",
-            rep.get("wallets"),
-            rep.get("mints"),
-        )
-    else:
-        log.error("Wallet follow report failed")
-
-
-async def _send_leaderboard(http, state: State, attention, scanned: int) -> None:
-    rows = state.list_posted()
-    for row in rows:
+async def _send_gather(http, state: State) -> None:
+    since = int(time.time()) - config.WALLET_REPORT_SEC
+    spots = state.gather_since(since).get("spots") or []
+    for row in spots:
         mint = row.get("mint")
         if not mint:
             continue
@@ -303,20 +258,26 @@ async def _send_leaderboard(http, state: State, attention, scanned: int) -> None
         ath = float(coin.get("ath_market_cap") or last)
         prev_ath = float(row.get("ath_mc") or 0)
         state.update_quotes(mint, last, max(ath, prev_ath, last))
-    rows = state.list_posted()
-    text = format_leaderboard(rows, scanned, len(attention.stories))
+    for row in state.gather_since(since).get("armed") or []:
+        mint = row.get("mint")
+        if not mint:
+            continue
+        coin = await fetch_coin(http, mint)
+        if not coin:
+            continue
+        state.upsert_tape(coin)
+    rep = state.gather_since(since)
+    hours = max(1, config.WALLET_REPORT_SEC // 3600)
+    text = format_gather(rep, hours)
     ok = await send(http, text)
     if ok:
-        log.info("Leaderboard sent (%s tracked)", len(rows))
+        log.info(
+            "Gather dump sent (spots %s armed %s)",
+            len(rep.get("spots") or []),
+            len(rep.get("armed") or []),
+        )
     else:
-        log.error("Leaderboard send failed")
-    if config.PAPER_ENABLED:
-        snap = paper.snapshot(state)
-        health.STATUS["paper_equity"] = round(snap["equity"], 4)
-        book = format_paper_book(snap)
-        sent_book = await send(http, book)
-        if sent_book:
-            log.info("Paper book sent (equity %.3f)", snap["equity"])
+        log.error("Gather dump failed")
 
 
 async def _refresh_paper_marks(http, state: State) -> None:
