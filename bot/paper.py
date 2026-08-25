@@ -71,7 +71,7 @@ def snapshot(state: State) -> dict:
     }
 
 
-def try_open(state: State, coin: dict, path: str = "") -> Fill | None:
+def try_open(state: State, coin: dict, path: str = "", size_sol: float | None = None) -> Fill | None:
     mint = coin.get("mint") or ""
     if not mint or state.paper_position(mint):
         return None
@@ -80,7 +80,9 @@ def try_open(state: State, coin: dict, path: str = "") -> Fill | None:
     if len(opens) >= config.PAPER_MAX_OPEN:
         log.info("Paper skip %s — already %s open", coin.get("symbol"), len(opens))
         return None
-    size = buy_size(snap["equity"], float(coin.get("usd_market_cap") or 0))
+    size = float(size_sol) if size_sol is not None else buy_size(
+        snap["equity"], float(coin.get("usd_market_cap") or 0)
+    )
     if size <= 0 or snap["cash"] < size:
         log.info("Paper skip %s — cash %.3f size %.3f", coin.get("symbol"), snap["cash"], size)
         return None

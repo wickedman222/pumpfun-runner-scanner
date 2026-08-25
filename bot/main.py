@@ -5,7 +5,9 @@ import logging
 import sys
 import time
 from . import config, health, paper
+from .alpha import all_alphas, copy_alphas
 from .attention import Attention
+from .copy import poll_all as copy_poll
 from .engine import evaluate_new
 from . import wallets as walletmod
 from .httputil import client
@@ -17,7 +19,15 @@ from .pump import (
     live_coins,
 )
 from .state import State
-from .telegram import format_gather, format_paper_book, format_paper_fill, send
+from .telegram import (
+    format_copy_boot,
+    format_copy_hit,
+    format_copy_session,
+    format_gather,
+    format_paper_book,
+    format_paper_fill,
+    send,
+)
 
 # Railway paints stderr red. Keep INFO on stdout so the dashboard stays white.
 logging.basicConfig(
@@ -81,13 +91,45 @@ async def run() -> None:
         except Exception as exc:
             log.warning("Initial attention refresh failed: %s", exc)
 
-        log.info(
-            "Scanner loop started. paper ON v4-1 2 SOL. buy early continuation under $28k"
-        )
+        if config.COPY_MODE:
+            log.info(
+                "Copy loop. paper %s SOL book %s. %s copy / %s observe wallets",
+                f"{(paper_snap or {}).get('equity') or config.PAPER_START_SOL:.3f}",
+                config.PAPER_BOOK_ID,
+                len(copy_alphas()),
+                len(all_alphas()) - len(copy_alphas()),
+            )
+            if paper_snap:
+                await send(http, format_copy_boot(paper_snap, all_alphas()))
+        else:
+            log.info("Scanner loop started (tape mode)")
 
         while True:
             loop_start = time.time()
             try:
+                if config.COPY_MODE:
+                    hits = await copy_poll(http, state)
+                    for hit in hits:
+                        await _copy_fill(http, state, hit)
+                    if config.PAPER_ENABLED:
+                        await _manage_paper(http, state)
+                    health.STATUS["paper_equity"] = round(
+                        paper.snapshot(state)["equity"], 4
+                    ) if config.PAPER_ENABLED else 0
+                    health.STATUS["watches"] = len(copy_alphas())
+                    if time.time() - last_gather_report >= config.WALLET_REPORT_SEC:
+                        snap = paper.snapshot(state) if config.PAPER_ENABLED else {
+                            "equity": 0, "start": 2, "cash": 0, "open": [], "closed_n": 0, "pnl": 0, "unreal": 0, "size": 0
+                        }
+                        ok = await send(http, format_copy_session(snap, all_alphas()))
+                        if ok:
+                            log.info("Copy session dump sent eq %.3f", snap["equity"])
+                        last_gather_report = time.time()
+                    health.STATUS["last_error"] = ""
+                    elapsed = time.time() - loop_start
+                    await asyncio.sleep(max(1.0, config.COPY_POLL_SEC - elapsed))
+                    continue
+
                 if time.time() - last_attention >= config.ATTENTION_POLL_SEC:
                     await attention.refresh(http)
                     last_attention = time.time()
@@ -232,6 +274,28 @@ async def _refresh_tracked(http, state: State) -> list[dict]:
         if isinstance(item, dict) and item.get("mint"):
             out.append(item)
     return out
+
+
+async def _copy_fill(http, state: State, hit) -> None:
+    coin = hit.coin
+    log.info(
+        "COPY %s %s %.3f SOL (%.0f%%) — %s",
+        hit.alpha.name,
+        coin.get("symbol"),
+        hit.size_sol,
+        hit.frac * 100,
+        hit.thesis,
+    )
+    if not config.PAPER_ENABLED:
+        return
+    fill = paper.try_open(state, coin, path=f"copy:{hit.alpha.name}", size_sol=hit.size_sol)
+    if not fill:
+        return
+    state.mark_posted(coin, hit.thesis)
+    snap = paper.snapshot(state)
+    health.STATUS["paper_equity"] = round(snap["equity"], 4)
+    await send(http, format_copy_hit(hit, snap), preview=True)
+    await send(http, format_paper_fill(fill, snap), preview=True)
 
 
 async def _note_spot(http, state: State, verdict) -> None:

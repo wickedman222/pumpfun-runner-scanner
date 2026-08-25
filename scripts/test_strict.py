@@ -214,7 +214,28 @@ assert wallet_buy_ok(coin(4_000), now).startswith("thin")
 assert wallet_buy_ok(coin(25_000, ath=26_000), now) == ""
 assert "boost" in wallet_buy_ok(uotf, now)
 
+from bot.copy import copy_size, entry_fail
 from bot.telegram import format_gather
+
+assert abs(copy_size(2.0, 2.0, 1, 1.0, 2.0) - 0.16) < 1e-9
+assert copy_size(2.0, 2.0, 3, 1.0, 2.0) <= 0.30
+assert copy_size(2.0, 0.30, 1, 1.0, 2.0) == 0.0  # cash floor
+assert entry_fail({"usd_market_cap": 5_000, "ath_market_cap": 5_000, "boost_mode": "NONE", "created_timestamp": int(now * 1000), "complete": False}, now, 10).startswith("thin")
+assert not entry_fail(
+    {
+        "usd_market_cap": 20_000,
+        "ath_market_cap": 21_000,
+        "boost_mode": "NONE",
+        "created_timestamp": int(now * 1000),
+        "complete": False,
+        "mayhem_state": "NONE",
+        "is_cashback_enabled": False,
+        "reply_count": 0,
+        "is_currently_live": False,
+    },
+    now,
+    40,
+)
 
 g = format_gather(
     {

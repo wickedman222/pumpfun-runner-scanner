@@ -293,6 +293,67 @@ def mark_sol(pos: dict) -> float:
     return qty * (last / entry)
 
 
+def format_copy_boot(snap: dict | None, alphas: list) -> str:
+    eq = float((snap or {}).get("equity") or 2.0)
+    lines = [
+        "<b>copy paper</b>",
+        f"equity <b>{eq:.3f} SOL</b> · start 2.000 · max 15%/trade · 25% cash floor",
+        "",
+        "<b>watchlist</b>",
+    ]
+    for a in alphas:
+        tag = "COPY" if a.copy else "OBS"
+        wr = f"{a.wr*100:.0f}% WR" if a.wr else "n/a WR"
+        lines.append(f"• {tag} {_esc(a.name)}  {wr}")
+        lines.append(f"  <code>{_esc(a.address)}</code>")
+    lines.append("\n<i>No real SOL. First run only marks wallet cursors — no historical copy.</i>")
+    return "\n".join(lines)
+
+
+def format_copy_hit(hit, snap: dict) -> str:
+    coin = hit.coin
+    usd = float(coin.get("usd_market_cap") or 0)
+    lines = [
+        "<b>COPY BUY</b>  (paper)",
+        f"${_esc(coin.get('symbol'))}  {_esc(coin.get('name') or '')}",
+        f"<a href=\"{_esc(coin.get('url') or '')}\">{_esc(coin.get('mint') or '')}</a>",
+        "",
+        _esc(hit.thesis),
+        f"size <b>{hit.size_sol:.3f} SOL</b> ({hit.frac*100:.1f}% eq) · MC ${_esc(f'{usd:,.0f}')}",
+        f"invalidate: {_esc(hit.invalidation)}",
+        "",
+        f"equity <b>{snap['equity']:.3f} SOL</b>  cash {snap['cash']:.3f}  open {len(snap['open'])}",
+    ]
+    return "\n".join(lines)
+
+
+def format_copy_session(snap: dict, alphas: list, hours: int = 6) -> str:
+    pnl = snap["equity"] - snap["start"]
+    lines = [
+        f"<b>{hours}h copy book</b>",
+        f"equity <b>{snap['equity']:.3f} SOL</b>  {_esc(_fmt_sol(pnl))} from {snap['start']:.2f}",
+        f"cash {snap['cash']:.3f} · open {len(snap['open'])} · closed {snap['closed_n']}",
+        "",
+    ]
+    if snap["open"]:
+        lines.append("<b>open</b>")
+        for p in snap["open"]:
+            entry = float(p.get("entry_mc") or 0)
+            last = float(p.get("last_mc") or 0)
+            mult = (last / entry) if entry else 0
+            lines.append(
+                f"• ${_esc(p.get('symbol') or '?')}  {mult:.2f}x  "
+                f"{float(p.get('remaining_frac') or 0)*100:.0f}%  {_esc(p.get('path') or '')}"
+            )
+    else:
+        lines.append("no open paper")
+    lines += ["", "<b>book</b>"]
+    for a in alphas:
+        tag = "C" if a.copy else "O"
+        lines.append(f"{tag} {_esc(a.name)}")
+    return "\n".join(lines)
+
+
 def format_gather(rep: dict, hours: int = 6) -> str:
     """One dump of what we actually saw. No boot/candidate/paper fluff."""
 

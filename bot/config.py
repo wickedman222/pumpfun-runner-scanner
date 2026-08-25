@@ -104,7 +104,7 @@ TAPE_REFRESH_LIMIT = _int("TAPE_REFRESH_LIMIT", 80)
 MAX_SIGNALS_PER_DAY = _int("MAX_SIGNALS_PER_DAY", 0)
 # Only posts stamped with this id count toward the daily cap.
 # Bump when the strat changes so leftover rows from an old loop do not sit us out.
-SIGNAL_BOOK_ID = _env("SIGNAL_BOOK_ID", "v4-1")
+SIGNAL_BOOK_ID = _env("SIGNAL_BOOK_ID", "copy-1")
 MIN_MATCH_SCORE = _int("MIN_MATCH_SCORE", 100)
 LEADERBOARD_SEC = _int("LEADERBOARD_SEC", 6 * 3600)
 LEADERBOARD_SIZE = _int("LEADERBOARD_SIZE", 15)
@@ -146,11 +146,17 @@ WALLET_BOOK_ID = _env("WALLET_BOOK_ID", "v2-1")
 PAPER_ENABLED = _int("PAPER_ENABLED", 1) == 1
 PAPER_START_SOL = _float("PAPER_START_SOL", 2.0)
 # Bump this string to flatten the paper book and start from PAPER_START_SOL again.
-PAPER_BOOK_ID = _env("PAPER_BOOK_ID", "v4-1")
-PAPER_SIZE_FRAC = _float("PAPER_SIZE_FRAC", 0.05)  # 2 SOL → 0.10
+PAPER_BOOK_ID = _env("PAPER_BOOK_ID", "copy-1")
+PAPER_SIZE_FRAC = _float("PAPER_SIZE_FRAC", 0.08)  # 2 SOL → 0.16, capped
 PAPER_SIZE_MIN = _float("PAPER_SIZE_MIN", 0.10)
-PAPER_SIZE_MAX = _float("PAPER_SIZE_MAX", 0.12)
-PAPER_MAX_OPEN = _int("PAPER_MAX_OPEN", 3)
+PAPER_SIZE_MAX = _float("PAPER_SIZE_MAX", 0.30)
+PAPER_MAX_OPEN = _int("PAPER_MAX_OPEN", 4)
+COPY_MODE = _int("COPY_MODE", 1) == 1
+COPY_MAX_LAG_SEC = _int("COPY_MAX_LAG_SEC", 180)
+COPY_MIN_MC = _float("COPY_MIN_MC", 8_000)
+COPY_MAX_MC = _float("COPY_MAX_MC", 90_000)
+COPY_MAX_AGE_SEC = _int("COPY_MAX_AGE_SEC", 4 * 3600)
+COPY_POLL_SEC = _int("COPY_POLL_SEC", 15)
 PAPER_MIN_EQUITY = _float("PAPER_MIN_EQUITY", 0.25)
 PAPER_FEE = _float("PAPER_FEE", 0.01)
 PAPER_ENTRY_SLIP = _float("PAPER_ENTRY_SLIP", 0.08)

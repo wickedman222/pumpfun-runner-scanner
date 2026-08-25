@@ -161,6 +161,17 @@ class State:
                     k TEXT PRIMARY KEY,
                     v TEXT
                 );
+                CREATE TABLE IF NOT EXISTS copy_cursor (
+                    wallet TEXT PRIMARY KEY,
+                    last_sig TEXT,
+                    updated_at INTEGER
+                );
+                CREATE TABLE IF NOT EXISTS copy_hits (
+                    wallet TEXT NOT NULL,
+                    mint TEXT NOT NULL,
+                    seen_at INTEGER,
+                    PRIMARY KEY (wallet, mint)
+                );
                 CREATE TABLE IF NOT EXISTS tape (
                     mint TEXT PRIMARY KEY,
                     symbol TEXT,
@@ -537,6 +548,43 @@ class State:
         with self._conn() as con:
             row = con.execute("SELECT 1 FROM tx_harvested WHERE mint = ?", (mint,)).fetchone()
         return bool(row)
+
+    def copy_cursor(self, wallet: str) -> str:
+        with self._conn() as con:
+            row = con.execute(
+                "SELECT last_sig FROM copy_cursor WHERE wallet = ?", (wallet,)
+            ).fetchone()
+        return str(row["last_sig"] or "") if row else ""
+
+    def set_copy_cursor(self, wallet: str, sig: str) -> None:
+        with self._conn() as con:
+            con.execute(
+                """
+                INSERT INTO copy_cursor(wallet, last_sig, updated_at)
+                VALUES (?,?,?)
+                ON CONFLICT(wallet) DO UPDATE SET last_sig = excluded.last_sig, updated_at = excluded.updated_at
+                """,
+                (wallet, sig or "", int(time.time())),
+            )
+
+    def note_copy_hit(self, wallet: str, mint: str) -> None:
+        with self._conn() as con:
+            con.execute(
+                """
+                INSERT INTO copy_hits(wallet, mint, seen_at) VALUES (?,?,?)
+                ON CONFLICT(wallet, mint) DO UPDATE SET seen_at = excluded.seen_at
+                """,
+                (wallet, mint, int(time.time())),
+            )
+
+    def copy_hit_count(self, mint: str, window_sec: int = 1200) -> int:
+        cut = int(time.time()) - window_sec
+        with self._conn() as con:
+            row = con.execute(
+                "SELECT COUNT(*) n FROM copy_hits WHERE mint = ? AND seen_at >= ?",
+                (mint, cut),
+            ).fetchone()
+        return int(row["n"] if row else 0)
 
     def get_meta(self, key: str, default: str = "") -> str:
         with self._conn() as con:
