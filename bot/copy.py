@@ -140,17 +140,16 @@ async def scan_wallet(
         [alpha.address, {"limit": 12, "commitment": "confirmed"}],
     )
     rows = (js or {}).get("result") or []
+    newest = (rows[0].get("signature") or "") if rows else ""
+    if not cursor:
+        # First run: pin the tip. Do not copy history.
+        state.set_copy_cursor(alpha.address, newest)
+        log.info("Cursor %s ready", alpha.name)
+        return []
     out: list[tuple[str, str, float]] = []
-    seen_cursor = False
-    newest = cursor
     for row in rows:
         sig = row.get("signature") or ""
-        if not sig:
-            continue
-        if not newest:
-            newest = sig
-        if sig == cursor:
-            seen_cursor = True
+        if not sig or sig == cursor:
             break
         if row.get("err"):
             continue
@@ -166,10 +165,6 @@ async def scan_wallet(
         await _sleep()
     if newest and newest != cursor:
         state.set_copy_cursor(alpha.address, newest)
-    if not cursor and not seen_cursor:
-        # First run: do not copy the whole history, only mark cursor.
-        state.set_copy_cursor(alpha.address, newest or "")
-        return []
     return list(reversed(out))
 
 
@@ -262,4 +257,6 @@ async def poll_all(http: httpx.AsyncClient, state: State) -> list[CopyHit]:
                 seen_mint.add(mint)
                 hits.append(hit)
         await _sleep()
+    if hits:
+        log.info("Copy scan %s new buys", len(hits))
     return hits
