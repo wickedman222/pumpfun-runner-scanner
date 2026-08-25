@@ -129,7 +129,7 @@ async def scan_wallet(
     js = await _rpc(
         http,
         "getSignaturesForAddress",
-        [alpha.address, {"limit": 12, "commitment": "confirmed"}],
+        [alpha.address, {"limit": 8, "commitment": "confirmed"}],
     )
     if js is None:
         log.warning("scan %s: rpc miss", alpha.name)
@@ -168,7 +168,7 @@ async def scan_wallet(
 async def _sleep() -> None:
     import asyncio
 
-    await asyncio.sleep(0.12)
+    await asyncio.sleep(0.7)
 
 
 async def consider(

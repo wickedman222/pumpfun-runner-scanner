@@ -42,23 +42,31 @@ def _rpc_client() -> httpx.AsyncClient:
 
 
 async def rpc(method: str, params: list) -> dict | None:
-    try:
-        r = await _rpc_client().post(
-            config.SOLANA_RPC_URL,
-            json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
-            timeout=20.0,
-        )
-        if r.status_code != 200:
-            log.warning("Solana RPC %s HTTP %s", method, r.status_code)
+    last_status = 0
+    for attempt in range(4):
+        try:
+            r = await _rpc_client().post(
+                config.SOLANA_RPC_URL,
+                json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
+                timeout=20.0,
+            )
+            last_status = r.status_code
+            if r.status_code == 429:
+                await asyncio.sleep(1.4 * (attempt + 1))
+                continue
+            if r.status_code != 200:
+                log.warning("Solana RPC %s HTTP %s", method, r.status_code)
+                return None
+            js = r.json()
+            if isinstance(js, dict) and js.get("error"):
+                log.warning("Solana RPC %s: %s", method, js["error"])
+                return None
+            return js
+        except Exception as exc:
+            log.warning("Solana RPC %s fail: %s", method, exc)
             return None
-        js = r.json()
-        if isinstance(js, dict) and js.get("error"):
-            log.warning("Solana RPC %s: %s", method, js["error"])
-            return None
-        return js
-    except Exception as exc:
-        log.warning("Solana RPC %s fail: %s", method, exc)
-        return None
+    log.warning("Solana RPC %s HTTP %s", method, last_status or 429)
+    return None
 
 
 async def get_json(http: httpx.AsyncClient, url: str, **kwargs: Any) -> Any:
