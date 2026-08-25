@@ -15,6 +15,7 @@ import httpx
 from . import config
 from .alpha import Alpha
 from .attention import extract_farm_reason
+from .httputil import rpc
 from .pump import age_seconds, fetch_coin
 from .state import State
 
@@ -39,18 +40,9 @@ class CopyHit:
     invalidation: str
 
 
-async def _rpc(http: httpx.AsyncClient, method: str, params: list) -> dict | None:
-    try:
-        r = await http.post(
-            config.SOLANA_RPC_URL,
-            json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
-            timeout=20.0,
-        )
-        if r.status_code != 200:
-            return None
-        return r.json()
-    except Exception:
-        return None
+async def _rpc(_http: httpx.AsyncClient, method: str, params: list) -> dict | None:
+    # Dedicated RPC client — the pump.fun Origin on `http` 403s public Solana RPC.
+    return await rpc(method, params)
 
 
 def _pubkey(item) -> str:
@@ -139,10 +131,15 @@ async def scan_wallet(
         "getSignaturesForAddress",
         [alpha.address, {"limit": 12, "commitment": "confirmed"}],
     )
-    rows = (js or {}).get("result") or []
+    if js is None:
+        log.warning("scan %s: rpc miss", alpha.name)
+        return []
+    rows = js.get("result") or []
     newest = (rows[0].get("signature") or "") if rows else ""
     if not cursor:
-        # First run: pin the tip. Do not copy history.
+        # First run: pin the tip. Do not copy history. Empty pin does not count.
+        if not newest:
+            return []
         state.set_copy_cursor(alpha.address, newest)
         log.info("Cursor %s ready", alpha.name)
         return []
@@ -257,6 +254,5 @@ async def poll_all(http: httpx.AsyncClient, state: State) -> list[CopyHit]:
                 seen_mint.add(mint)
                 hits.append(hit)
         await _sleep()
-    if hits:
-        log.info("Copy scan %s new buys", len(hits))
+    log.info("Copy poll %s new buys", len(hits))
     return hits

@@ -6,6 +6,8 @@ from typing import Any
 
 import httpx
 
+from . import config
+
 log = logging.getLogger("runner")
 
 HEADERS = {
@@ -18,9 +20,45 @@ HEADERS = {
     "Referer": "https://pump.fun/",
 }
 
+# Public Solana RPC 403s the pump.fun Origin/Referer the rest of the bot sends.
+_RPC_HTTP: httpx.AsyncClient | None = None
+
 
 def client() -> httpx.AsyncClient:
     return httpx.AsyncClient(timeout=20.0, headers=HEADERS, follow_redirects=True)
+
+
+def _rpc_client() -> httpx.AsyncClient:
+    global _RPC_HTTP
+    if _RPC_HTTP is None or _RPC_HTTP.is_closed:
+        _RPC_HTTP = httpx.AsyncClient(
+            timeout=20.0,
+            headers={
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+        )
+    return _RPC_HTTP
+
+
+async def rpc(method: str, params: list) -> dict | None:
+    try:
+        r = await _rpc_client().post(
+            config.SOLANA_RPC_URL,
+            json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
+            timeout=20.0,
+        )
+        if r.status_code != 200:
+            log.warning("Solana RPC %s HTTP %s", method, r.status_code)
+            return None
+        js = r.json()
+        if isinstance(js, dict) and js.get("error"):
+            log.warning("Solana RPC %s: %s", method, js["error"])
+            return None
+        return js
+    except Exception as exc:
+        log.warning("Solana RPC %s fail: %s", method, exc)
+        return None
 
 
 async def get_json(http: httpx.AsyncClient, url: str, **kwargs: Any) -> Any:

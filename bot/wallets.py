@@ -15,7 +15,7 @@ import httpx
 
 from . import config
 from .attention import extract_farm_reason
-from .httputil import get_json
+from .httputil import get_json, rpc
 from .pump import age_seconds, fetch_coin, normalize_coin
 from .state import State
 
@@ -129,18 +129,8 @@ async def harvest_coin(
     return hidden
 
 
-async def _rpc(http: httpx.AsyncClient, method: str, params: list) -> dict | None:
-    try:
-        r = await http.post(
-            config.SOLANA_RPC_URL,
-            json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
-            timeout=25.0,
-        )
-        if r.status_code != 200:
-            return None
-        return r.json()
-    except Exception:
-        return None
+async def _rpc(_http: httpx.AsyncClient, method: str, params: list) -> dict | None:
+    return await rpc(method, params)
 
 
 def _pubkey(item) -> str:
