@@ -82,7 +82,7 @@ async def run() -> None:
             log.warning("Initial attention refresh failed: %s", exc)
 
         log.info(
-            "Scanner loop started. paper OFF. no live TG except 6h gather dump"
+            "Scanner loop started. paper ON v4-1 2 SOL. buy early continuation under $28k"
         )
 
         while True:
@@ -162,7 +162,7 @@ async def run() -> None:
                     usd = float(coin.get("usd_market_cap") or 0)
                     notable = usd >= config.MIN_ARM_MC
                     if verdict.post:
-                        await _note_spot(state, verdict)
+                        await _note_spot(http, state, verdict)
                         continue
                     if verdict.failed_gate == "watch":
                         if verdict.story and str(verdict.story.title).startswith("Armed"):
@@ -234,7 +234,7 @@ async def _refresh_tracked(http, state: State) -> list[dict]:
     return out
 
 
-async def _note_spot(state: State, verdict) -> None:
+async def _note_spot(http, state: State, verdict) -> None:
     coin = verdict.coin
     why = verdict.fail_reason or (verdict.story.title if verdict.story else "tape")
     story_title = getattr(verdict.story, "title", "") or why
@@ -242,6 +242,14 @@ async def _note_spot(state: State, verdict) -> None:
     state.mark_tape(coin.get("mint") or "", "triggered", why)
     health.STATUS["posted"] = len(state.list_posted())
     log.info("SPOT %s — %s", coin.get("symbol"), why)
+    if not config.PAPER_ENABLED:
+        return
+    fill = paper.try_open(state, coin, verdict.path or "tape")
+    if not fill:
+        return
+    snap = paper.snapshot(state)
+    health.STATUS["paper_equity"] = round(snap["equity"], 4)
+    await send(http, format_paper_fill(fill, snap), preview=True)
 
 
 async def _send_gather(http, state: State) -> None:

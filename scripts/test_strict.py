@@ -106,19 +106,19 @@ armed = {"armed_mc": 12_000, "armed_at": now - 10}
 c = decide(coin(24_000), armed, older=None, copies=0, now=now)
 assert c.action == "watch" and "waiting" in c.reason, c
 
-# Two+ polls, +40% near ATH — rip.
+# Two+ polls, +25% near ATH under $28k — early continuation.
 armed = {"armed_mc": 12_000, "armed_at": now - 30}
-c = decide(coin(24_000, ath=24_000), armed, older=None, copies=0, now=now)
-assert c.action == "trigger" and "rip" in c.reason, c
+c = decide(coin(16_000, ath=16_000), armed, older=None, copies=0, now=now)
+assert c.action == "trigger" and "early" in c.reason, c
 
 # 5 min later, +60%, near ATH — held expansion.
 armed = {"armed_mc": 12_000, "armed_at": now - 300}
 c = decide(coin(22_000, ath=22_000), armed, older=None, copies=0, now=now)
 assert c.action == "trigger", c
 
-# Expanded but off highs — do not buy the dump. 22k vs 32k is ~31% off.
+# Off highs after arm — skip, do not buy the reclaim.
 c = decide(coin(22_000, ath=32_000), armed, older=None, copies=0, now=now)
-assert c.action == "watch" and "off highs" in c.reason, c
+assert c.action == "skip" and "rolled" in c.reason, c
 
 # Graduation after we armed on-curve and held — still need +60% and near highs.
 c = decide(coin(22_000, complete=True, ath=22_000), armed, older=None, copies=0, now=now)
@@ -173,7 +173,7 @@ async def _engine_paths() -> None:
             "UPDATE tape SET armed_at = ? WHERE mint = ?",
             (int(time.time()) - 200, "arm2"),
         )
-    live_row = coin(15_000, mint="arm2", complete=False, ath=15_000)
+    live_row = coin(13_000, mint="arm2", complete=False, ath=13_000)
     live_row["is_currently_live"] = True
     live_row["num_participants"] = 22
     v = await run(live_row)

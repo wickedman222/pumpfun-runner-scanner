@@ -1,7 +1,7 @@
-"""Spot on-curve. Buy expansion. Never the graduation fill.
+"""Arm cheap on-curve. Buy the next print if it is still cheap.
 
-Live rooms and leftover wallets were traps. The only thing we can actually
-see in time is: we armed this mint on-curve, then it kept going near ATH.
+Gather showed $8k arms turning into $40k+ 'rips' — that is the curve top.
+Buy only +25% from our arm while MC is still under $28k. Missed it = skip.
 """
 
 from __future__ import annotations
@@ -64,33 +64,27 @@ def decide(coin: dict, row: dict, *, older: dict | None, copies: int, now: float
         return Call("arm", f"on-curve first print ${usd:,.0f}", armed_mc=usd)
 
     held = (now - armed_at) if armed_at else 0.0
+    dd = _dd(usd, ath)
+    # Missed the cheap part. $35k+ prints were graduation tops.
     if usd > config.MAX_FIRST_LOOK_MC:
-        return Call("skip", f"chase ${usd:,.0f}", armed_mc=armed_mc)
-    if _dd(usd, ath) > config.MAX_DD_AT_BUY:
+        return Call("skip", f"late ${usd:,.0f}", armed_mc=armed_mc)
+    # Off highs after we armed: dead. Do not buy the reclaim 3x higher.
+    if dd > config.MAX_DD_AT_BUY:
         return Call(
-            "watch",
-            f"armed ${armed_mc:,.0f} now ${usd:,.0f} but off highs (ATH ${ath:,.0f})",
+            "skip",
+            f"rolled over ${usd:,.0f} vs ATH ${ath:,.0f}",
             armed_mc=armed_mc,
         )
     if usd < config.MIN_BUY_MC:
-        if held < config.MIN_ARM_HOLD_SEC:
-            return Call(
-                "watch",
-                f"armed ${armed_mc:,.0f} now ${usd:,.0f} · waiting {config.MIN_ARM_HOLD_SEC - held:.0f}s",
-                armed_mc=armed_mc,
-            )
-        return Call("watch", f"armed ${armed_mc:,.0f} now ${usd:,.0f}", armed_mc=armed_mc)
-
-    dd = _dd(usd, ath)
-    # Fast rip: two+ polls, still glued to highs, +40% from our arm.
-    if (
-        held >= config.FAST_HOLD_SEC
-        and usd >= armed_mc * config.FAST_MULT
-        and dd <= 0.20
-    ):
+        return Call(
+            "watch",
+            f"armed ${armed_mc:,.0f} now ${usd:,.0f}",
+            armed_mc=armed_mc,
+        )
+    if held >= config.FAST_HOLD_SEC and usd >= armed_mc * config.FAST_MULT:
         return Call(
             "trigger",
-            f"rip {held:.0f}s · ${armed_mc:,.0f}→${usd:,.0f} · dd {dd*100:.0f}%",
+            f"early {held:.0f}s · ${armed_mc:,.0f}→${usd:,.0f} · dd {dd*100:.0f}%",
             armed_mc=armed_mc,
         )
     if held < config.MIN_ARM_HOLD_SEC:

@@ -65,11 +65,17 @@ async def inspect(http: httpx.AsyncClient, coin: dict) -> Structure:
         for risk in risks:
             name = str(risk.get("name") or risk.get("description") or "").lower()
             level = str(risk.get("level") or "").lower()
-            if any(k in name for k in RISK_KILL) and level in {"danger", "warn", "critical", ""}:
+            early = float(coin.get("usd_market_cap") or 0) < 30_000
+            kills = RISK_KILL if not early else {
+                "rugged", "honeypot", "freeze authority", "mint authority",
+            }
+            if any(k in name for k in kills) and level in {"danger", "warn", "critical", ""}:
                 out.reasons_fail.append(f"rugcheck: {risk.get('name')}")
         if out.rugged:
             out.reasons_fail.append("rugcheck marked rugged")
-        if out.rug_score and out.rug_score > config.MAX_RUGCHECK_SCORE:
+        usd_now = float(coin.get("usd_market_cap") or 0)
+        # Young curve books are always concentrated. Rug-score/holders only after size.
+        if usd_now >= 30_000 and out.rug_score and out.rug_score > config.MAX_RUGCHECK_SCORE:
             out.reasons_fail.append(f"rugcheck score {out.rug_score} > {config.MAX_RUGCHECK_SCORE}")
     else:
         out.notes.append("rugcheck unavailable — using weak structure fallback")
@@ -91,18 +97,18 @@ async def inspect(http: httpx.AsyncClient, coin: dict) -> Structure:
         out.top_holder_pct = round(real_holders[0][1], 2)
         out.top10_pct = round(sum(p for _, p, _ in real_holders[:10]), 2)
 
-    if out.top_holder_pct > config.MAX_TOP_HOLDER_PCT:
-        out.reasons_fail.append(
-            f"top holder {out.top_holder_pct:.1f}% > {config.MAX_TOP_HOLDER_PCT}%"
-        )
-    if out.top10_pct > config.MAX_TOP10_PCT:
-        out.reasons_fail.append(f"top10 {out.top10_pct:.1f}% > {config.MAX_TOP10_PCT}%")
-    if out.insider_pct > config.MAX_INSIDER_PCT:
-        out.reasons_fail.append(f"insider {out.insider_pct:.1f}% > {config.MAX_INSIDER_PCT}%")
-    if out.total_holders and out.total_holders < config.MIN_UNIQUE_HOLDERS:
-        # too early is ok if still on curve and very new; only fail if already "busy"
-        if coin.get("usd_market_cap", 0) > 15_000:
-            out.reasons_fail.append(f"only {out.total_holders} holders at ${coin['usd_market_cap']:.0f} MC")
+    usd_now = float(coin.get("usd_market_cap") or 0)
+    if usd_now >= 30_000:
+        if out.top_holder_pct > config.MAX_TOP_HOLDER_PCT:
+            out.reasons_fail.append(
+                f"top holder {out.top_holder_pct:.1f}% > {config.MAX_TOP_HOLDER_PCT}%"
+            )
+        if out.top10_pct > config.MAX_TOP10_PCT:
+            out.reasons_fail.append(f"top10 {out.top10_pct:.1f}% > {config.MAX_TOP10_PCT}%")
+        if out.insider_pct > config.MAX_INSIDER_PCT:
+            out.reasons_fail.append(f"insider {out.insider_pct:.1f}% > {config.MAX_INSIDER_PCT}%")
+        if out.total_holders and out.total_holders < config.MIN_UNIQUE_HOLDERS:
+            out.reasons_fail.append(f"only {out.total_holders} holders at ${usd_now:.0f} MC")
 
     created = await creator_coins(http, coin.get("creator") or "")
     other = [c for c in created if c.get("mint") and c["mint"] != mint]

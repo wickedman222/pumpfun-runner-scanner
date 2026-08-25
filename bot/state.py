@@ -343,21 +343,29 @@ class State:
     def tape_due(self, limit: int = 50) -> list[dict]:
         cutoff = int(time.time()) - config.MAX_ACTIVE_AGE_SEC
         with self._conn() as con:
-            rows = con.execute(
+            hot = con.execute(
                 """
                 SELECT * FROM tape
                 WHERE last_seen_at >= ?
-                  AND status IN ('watching', 'armed', 'triggered')
-                ORDER BY CASE status
-                    WHEN 'triggered' THEN 0
-                    WHEN 'armed' THEN 1
-                    ELSE 2 END,
-                    last_seen_at ASC
+                  AND status IN ('armed', 'triggered')
+                ORDER BY last_seen_at ASC
                 LIMIT ?
                 """,
-                (cutoff, limit),
+                (cutoff, min(40, limit)),
             ).fetchall()
-        return [dict(r) for r in rows]
+            left = max(0, limit - len(hot))
+            rest = []
+            if left:
+                rest = con.execute(
+                    """
+                    SELECT * FROM tape
+                    WHERE last_seen_at >= ? AND status = 'watching'
+                    ORDER BY last_seen_at ASC
+                    LIMIT ?
+                    """,
+                    (cutoff, left),
+                ).fetchall()
+        return [dict(r) for r in list(hot) + list(rest)]
 
     def gather_since(self, since: int) -> dict:
         with self._conn() as con:
