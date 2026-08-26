@@ -7,7 +7,6 @@ import time
 from dataclasses import dataclass
 
 from . import config
-from .attention import extract_farm_reason
 from .state import State
 
 log = logging.getLogger("runner")
@@ -211,7 +210,7 @@ def _sell(state: State, pos: dict, frac_of_original: float, reason: str, mc: flo
 
 
 def decide(pos: dict, coin: dict) -> list[tuple[float, str]]:
-    """Return (frac_of_original, reason) sells to apply, in order."""
+    """Moonbag hold test: scale out at 2x/4x/10x. Never flatten."""
     mc = float(coin.get("usd_market_cap") or 0)
     if mc <= 0:
         return []
@@ -219,48 +218,15 @@ def decide(pos: dict, coin: dict) -> list[tuple[float, str]]:
     left = float(pos.get("remaining_frac") or 0)
     if left <= 0:
         return []
-    opened = int(pos.get("opened_at") or 0)
-    held = time.time() - opened if opened else 0
     tp1 = bool(int(pos.get("tp1_hit") or 0))
     tp2 = bool(int(pos.get("tp2_hit") or 0))
     tp3 = bool(int(pos.get("tp3_hit") or 0))
-    ath = max(float(pos.get("ath_mc") or 0), mc)
-    entry = float(pos.get("entry_mc") or 0)
     actions: list[tuple[float, str]] = []
 
-    farm = extract_farm_reason(coin)
-    if farm:
-        return [(left, f"dead: flipped farm ({farm})")]
-
-    if (not tp1) and entry and mc <= entry * config.PAPER_STOP_FRAC:
-        return [(left, f"dead: stop {multiple:.2f}x")]
-
-    if (
-        config.PAPER_TIME_DEAD_SEC > 0
-        and not tp1
-        and held >= config.PAPER_TIME_DEAD_SEC
-        and multiple < config.PAPER_TIME_DEAD_MULT
-    ):
-        return [(left, f"dead: no go {held/60:.0f}m {multiple:.2f}x")]
-
-    live_now = bool(coin.get("is_currently_live"))
-    if (
-        (pos.get("path") or "") == "live"
-        and not live_now
-        and not tp1
-        and held >= 30 * 60
-        and multiple < 1.2
-    ):
-        return [(left, f"dead: livestream died {multiple:.2f}x")]
-
-    # Trail only after 4x. Real runners routinely dip ~50% off ATH before the next leg
-    # (PANTS −53%, FISHBONE −61%). Trailing from 2x sold the bag on a normal pullback.
-    if tp2 and entry and ath > 0 and mc <= ath * (1.0 - config.PAPER_TRAIL_GIVEBACK):
-        return [(left, f"trail: gave back {multiple:.2f}x vs ATH {ath/entry:.2f}x")]
-
     if not tp1 and multiple >= config.PAPER_TP1_MULT:
-        actions.append((min(config.PAPER_TP1_SELL, left), f"TP1 {config.PAPER_TP1_MULT:.1f}x"))
-        left -= min(config.PAPER_TP1_SELL, left)
+        take = min(config.PAPER_TP1_SELL, left)
+        actions.append((take, f"TP1 {config.PAPER_TP1_MULT:.1f}x"))
+        left -= take
         tp1 = True
     if tp1 and not tp2 and multiple >= config.PAPER_TP2_MULT and left > 0:
         take = min(config.PAPER_TP2_SELL, left)

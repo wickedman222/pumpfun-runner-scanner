@@ -215,7 +215,7 @@ async def consider(
         f"bought ${(coin.get('usd_market_cap') or 0):,.0f} "
         f"lag {lag:.0f}s"
     )
-    inv = "alpha dump, −40% stop, or farm flip"
+    inv = "none — moonbag hold, no stop"
     return CopyHit(
         alpha=alpha,
         mint=mint,

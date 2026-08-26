@@ -48,8 +48,9 @@ def main() -> None:
 
     pos = st.paper_position("m1")
     pos["opened_at"] = int(time.time())
+    # Hold test: a −50% print must stay open. No stop.
     acts = decide(pos, coin("m1", 9_000))
-    assert acts and acts[0][1].startswith("dead: stop"), acts
+    assert acts == [], acts
 
     acts = decide(pos, coin("m1", 40_000))
     reasons = [a[1] for a in acts]
@@ -63,11 +64,13 @@ def main() -> None:
     pos["tp2_hit"] = 1
     pos["ath_mc"] = 80_000
     pos["remaining_frac"] = 0.50
-    # −65% of 80k = 28k. 20k should trail; 40k (50% off) should not.
+    # Moonbag holds through an ATH giveback. No trail flatten.
     acts = decide(pos, coin("m1", 40_000, ath=80_000))
     assert not acts, acts
     acts = decide(pos, coin("m1", 20_000, ath=80_000))
-    assert acts and acts[0][1].startswith("trail"), acts
+    assert not acts, acts
+    acts = decide(pos, coin("m1", 180_000, ath=180_000))
+    assert any("moonbag clip" in a[1] for a in acts), acts
 
     # 3h grind under 1.6x must stay open — no 2h no-go.
     pos = {
