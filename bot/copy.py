@@ -81,21 +81,11 @@ def _mint_bought(tx: dict, wallet: str) -> str:
 
 
 def copy_size(equity: float, cash: float, n_alphas: int, conv: float, peak: float) -> float:
+    del n_alphas, conv, peak
     if equity < config.PAPER_MIN_EQUITY:
         return 0.0
-    frac = 0.08 if n_alphas < 2 else 0.12
-    if n_alphas >= 3:
-        frac = 0.15
-    frac *= max(0.5, min(1.0, conv))
-    if peak > 0 and equity < 0.75 * peak:
-        frac *= 0.6
-    frac = min(0.15, max(0.05, frac))
-    size = round(equity * frac, 3)
-    size = max(config.PAPER_SIZE_MIN, min(config.PAPER_SIZE_MAX, size))
-    floor_cash = equity * 0.25
-    if cash - size < floor_cash:
-        size = round(max(0.0, cash - floor_cash), 3)
-    if size < config.PAPER_SIZE_MIN * 0.8:
+    size = round(config.PAPER_SIZE_FIXED, 3)
+    if cash < size:
         return 0.0
     return size
 

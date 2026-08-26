@@ -36,9 +36,9 @@ def main() -> None:
     config.DATA_DIR = tmp
     st = State(os.path.join(tmp, "c.db"))
 
-    assert abs(copy_size(2.0, 2.0, 1, 1.0, 2.0) - 0.16) < 1e-9
-    assert abs(copy_size(2.0, 2.0, 3, 1.0, 2.0) - 0.30) < 1e-9
-    assert copy_size(2.0, 0.55, 1, 1.0, 2.0) == 0.0
+    assert abs(copy_size(5.0, 5.0, 1, 1.0, 5.0) - 0.30) < 1e-9
+    assert abs(copy_size(5.0, 5.0, 3, 1.0, 5.0) - 0.30) < 1e-9
+    assert copy_size(5.0, 0.20, 1, 1.0, 5.0) == 0.0
 
     now = time.time()
     assert entry_fail(coin(18_000), now, 20) == ""

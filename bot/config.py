@@ -144,13 +144,14 @@ WALLET_BOOK_ID = _env("WALLET_BOOK_ID", "v2-1")
 
 # --- Paper book (no real SOL) ---
 PAPER_ENABLED = _int("PAPER_ENABLED", 1) == 1
-PAPER_START_SOL = _float("PAPER_START_SOL", 2.0)
+PAPER_START_SOL = _float("PAPER_START_SOL", 5.0)
 # Bump this string to flatten the paper book and start from PAPER_START_SOL again.
-PAPER_BOOK_ID = _env("PAPER_BOOK_ID", "copy-1")
-PAPER_SIZE_FRAC = _float("PAPER_SIZE_FRAC", 0.08)  # 2 SOL → 0.16, capped
-PAPER_SIZE_MIN = _float("PAPER_SIZE_MIN", 0.10)
+PAPER_BOOK_ID = _env("PAPER_BOOK_ID", "copy-5sol")
+PAPER_SIZE_FIXED = _float("PAPER_SIZE_FIXED", 0.30)
+PAPER_SIZE_FRAC = _float("PAPER_SIZE_FRAC", 0.0)  # unused — size is PAPER_SIZE_FIXED
+PAPER_SIZE_MIN = _float("PAPER_SIZE_MIN", 0.30)
 PAPER_SIZE_MAX = _float("PAPER_SIZE_MAX", 0.30)
-PAPER_MAX_OPEN = _int("PAPER_MAX_OPEN", 4)
+PAPER_MAX_OPEN = _int("PAPER_MAX_OPEN", 12)
 COPY_MODE = _int("COPY_MODE", 1) == 1
 COPY_MAX_LAG_SEC = _int("COPY_MAX_LAG_SEC", 180)
 COPY_MIN_MC = _float("COPY_MIN_MC", 8_000)

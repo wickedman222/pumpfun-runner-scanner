@@ -28,14 +28,10 @@ class Fill:
 
 
 def buy_size(equity: float, mc: float = 0.0) -> float:
+    del mc
     if equity < config.PAPER_MIN_EQUITY:
         return 0.0
-    size = equity * config.PAPER_SIZE_FRAC
-    size = max(config.PAPER_SIZE_MIN, min(config.PAPER_SIZE_MAX, size))
-    # Still take the just-graduated runner, but do not full-send a $150k local top.
-    if mc > config.PAPER_FULL_SIZE_MC:
-        size = max(config.PAPER_SIZE_MIN * 0.8, size * 0.7)
-    return round(size, 3)
+    return round(config.PAPER_SIZE_FIXED, 3)
 
 
 def _mult(pos: dict, mc: float) -> float:

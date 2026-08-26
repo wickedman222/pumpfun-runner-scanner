@@ -31,19 +31,20 @@ def main() -> None:
     os.environ["DATA_DIR"] = tmp
     config.DATA_DIR = tmp
     st = State(os.path.join(tmp, "t.db"))
-    st.ensure_paper_wallet(2.0)
+    st.ensure_paper_wallet(5.0)
 
-    assert abs(buy_size(2.0) - 0.16) < 1e-9, buy_size(2.0)
-    assert abs(buy_size(2.0, 18_000) - 0.16) < 1e-9, buy_size(2.0, 18_000)
-    assert abs(buy_size(2.0, 40_000) - 0.112) < 1e-9, buy_size(2.0, 40_000)
-    assert buy_size(1.2) == 0.10
+    assert abs(buy_size(5.0) - 0.30) < 1e-9, buy_size(5.0)
+    assert abs(buy_size(5.0, 18_000) - 0.30) < 1e-9, buy_size(5.0, 18_000)
+    assert abs(buy_size(5.0, 40_000) - 0.30) < 1e-9, buy_size(5.0, 40_000)
+    assert buy_size(1.2) == 0.30
     assert buy_size(4.0) == 0.30
     assert buy_size(0.2) == 0.0
 
     fill = try_open(st, coin("m1", 18_000, symbol="SHOBON"), path="tape")
     assert fill and fill.side == "buy"
     snap = snapshot(st)
-    assert abs(snap["cash"] - 1.84) < 1e-9, snap
+    assert abs(snap["cash"] - 4.70) < 1e-9, snap
+    assert abs(fill.sol + 0.30) < 1e-9, fill.sol
     assert len(snap["open"]) == 1
 
     pos = st.paper_position("m1")

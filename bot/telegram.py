@@ -297,7 +297,7 @@ def format_copy_boot(snap: dict | None, alphas: list) -> str:
     eq = float((snap or {}).get("equity") or 2.0)
     lines = [
         "<b>copy paper</b>",
-        f"equity <b>{eq:.3f} SOL</b> · start 2.000 · max 15%/trade · 25% cash floor",
+        f"equity <b>{eq:.3f} SOL</b> · start {config.PAPER_START_SOL:.3f} · {config.PAPER_SIZE_FIXED:.1f} SOL/trade · moonbag hold",
         "",
         "<b>watchlist</b>",
     ]
