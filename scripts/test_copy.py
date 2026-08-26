@@ -51,6 +51,9 @@ def main() -> None:
     assert st.copy_cursor("w1") == ""
     st.set_copy_cursor("w1", "sigABC")
     assert st.copy_cursor("w1") == "sigABC"
+    assert not st.copy_seen("w1", "mintA")
+    st.note_copy_hit("w1", "mintA")
+    assert st.copy_seen("w1", "mintA")
 
     print("copy rules ok")
 

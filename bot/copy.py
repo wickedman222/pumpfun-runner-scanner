@@ -173,7 +173,9 @@ async def consider(
     if not alpha.copy:
         log.info("Observe %s buy %s (no copy)", alpha.name, mint[:8])
         return None
-    if state.already_posted(mint) or state.paper_position(mint):
+    if state.already_posted(mint) or state.paper_position(mint) or state.copy_seen(
+        alpha.address, mint
+    ):
         state.note_copy_hit(alpha.address, mint)
         return None
     coin = await fetch_coin(http, mint)
@@ -183,6 +185,7 @@ async def consider(
     why = entry_fail(coin, now, lag)
     if why:
         log.info("Skip copy %s %s: %s", alpha.name, coin.get("symbol"), why)
+        state.note_copy_hit(alpha.address, mint)
         return None
     state.note_copy_hit(alpha.address, mint)
     n = state.copy_hit_count(mint, window_sec=20 * 60)
@@ -224,9 +227,9 @@ async def poll_all(http: httpx.AsyncClient, state: State) -> list[CopyHit]:
     now = time.time()
     hits: list[CopyHit] = []
     seen_mint: set[str] = set()
-    from .alpha import all_alphas
+    from .alpha import copy_alphas
 
-    for alpha in all_alphas():
+    for alpha in copy_alphas():
         try:
             buys = await scan_wallet(http, state, alpha)
         except Exception as exc:
@@ -240,8 +243,8 @@ async def poll_all(http: httpx.AsyncClient, state: State) -> list[CopyHit]:
                 state.note_copy_hit(alpha.address, mint)
                 continue
             hit = await consider(http, state, alpha, mint, sig, ts, now)
+            seen_mint.add(mint)
             if hit:
-                seen_mint.add(mint)
                 hits.append(hit)
         await _sleep()
     log.info("Copy poll %s new buys", len(hits))

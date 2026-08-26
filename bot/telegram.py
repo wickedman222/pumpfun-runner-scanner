@@ -24,12 +24,13 @@ def _why_token(path: str) -> str:
 
 
 async def send(http: httpx.AsyncClient, text: str, preview: bool = False) -> bool:
+    del preview  # always off — keep the URL, never the embed
     url = f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
         "chat_id": config.TELEGRAM_CHAT_ID,
         "text": text,
         "parse_mode": "HTML",
-        "disable_web_page_preview": not preview,
+        "disable_web_page_preview": True,
     }
     try:
         r = await http.post(url, json=payload, timeout=20.0)

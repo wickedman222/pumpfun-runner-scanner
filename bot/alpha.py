@@ -66,9 +66,9 @@ WATCHLIST: tuple[Alpha, ...] = (
     Alpha(
         "jason",
         "ACTbvbNm5qTLuofNRPxFPMtHAAtdH1CtzhCZatYHy831",
-        True,
+        False,
         0.85,
-        "85x $ANSEM on small size, 33.8% WR — size down, let winners run",
+        "copy-5sol: 0 fills, cashback spray only — observe",
         wr=0.338,
         pnl_30d_usd=71_173,
     ),

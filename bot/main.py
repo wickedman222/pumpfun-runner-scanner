@@ -294,8 +294,8 @@ async def _copy_fill(http, state: State, hit) -> None:
     state.mark_posted(coin, hit.thesis)
     snap = paper.snapshot(state)
     health.STATUS["paper_equity"] = round(snap["equity"], 4)
-    await send(http, format_copy_hit(hit, snap), preview=True)
-    await send(http, format_paper_fill(fill, snap), preview=True)
+    await send(http, format_copy_hit(hit, snap))
+    await send(http, format_paper_fill(fill, snap))
 
 
 async def _note_spot(http, state: State, verdict) -> None:
@@ -313,7 +313,7 @@ async def _note_spot(http, state: State, verdict) -> None:
         return
     snap = paper.snapshot(state)
     health.STATUS["paper_equity"] = round(snap["equity"], 4)
-    await send(http, format_paper_fill(fill, snap), preview=True)
+    await send(http, format_paper_fill(fill, snap))
 
 
 async def _send_gather(http, state: State) -> None:
@@ -394,7 +394,7 @@ async def _manage_paper(http, state: State) -> None:
         snap = paper.snapshot(state)
         health.STATUS["paper_equity"] = round(snap["equity"], 4)
         for fill in fills:
-            await send(http, format_paper_fill(fill, snap), preview=True)
+            await send(http, format_paper_fill(fill, snap))
 
 
 def main() -> None:

@@ -567,6 +567,14 @@ class State:
                 (wallet, sig or "", int(time.time())),
             )
 
+    def copy_seen(self, wallet: str, mint: str) -> bool:
+        with self._conn() as con:
+            row = con.execute(
+                "SELECT 1 FROM copy_hits WHERE wallet = ? AND mint = ?",
+                (wallet, mint),
+            ).fetchone()
+        return bool(row)
+
     def note_copy_hit(self, wallet: str, mint: str) -> None:
         with self._conn() as con:
             con.execute(
