@@ -710,6 +710,20 @@ class State:
                 ),
             )
 
+    def early_pairs(self) -> list[dict]:
+        with self._conn() as con:
+            rows = con.execute(
+                "SELECT wallet, mint, sold FROM early_hits"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def mark_early_sold(self, wallet: str, mint: str) -> None:
+        with self._conn() as con:
+            con.execute(
+                "UPDATE early_hits SET sold = 1 WHERE wallet = ? AND mint = ?",
+                (wallet, mint),
+            )
+
     def early_board(self, limit: int = 20) -> dict:
         with self._conn() as con:
             totals = con.execute(

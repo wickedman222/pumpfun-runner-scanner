@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from bot import config
-from bot.gather import is_winner
+from bot.gather import is_winner, sold_from_hold
 from bot.state import State
 
 
@@ -33,6 +33,9 @@ def main() -> None:
     assert is_winner(coin(50_000), now).startswith("ath")
     assert is_winner(coin(400_000), now) == ""
     assert is_winner(coin(400_000, cash=True), now)
+    assert sold_from_hold(1000, 0)
+    assert sold_from_hold(1000, 50)
+    assert not sold_from_hold(1000, 800)
 
     tmp = tempfile.mkdtemp()
     os.environ["DATA_DIR"] = tmp

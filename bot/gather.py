@@ -44,6 +44,32 @@ def _tok(b: dict) -> float:
     return float(((b.get("uiTokenAmount") or {}).get("uiAmount")) or 0)
 
 
+def sold_from_hold(tokens_in: float, left: float) -> bool:
+    """They dumped the bag if almost nothing is left."""
+    if left < 1:
+        return True
+    if tokens_in > 0 and left <= 0.20 * tokens_in:
+        return True
+    return False
+
+
+async def token_left(wallet: str, mint: str) -> float:
+    js = await rpc(
+        "getTokenAccountsByOwner",
+        [wallet, {"mint": mint}, {"encoding": "jsonParsed"}],
+    )
+    rows = ((js or {}).get("result") or {}).get("value") or []
+    total = 0.0
+    for acc in rows:
+        amt = (
+            (((acc.get("account") or {}).get("data") or {}).get("parsed") or {})
+            .get("info")
+            or {}
+        ).get("tokenAmount") or {}
+        total += float(amt.get("uiAmount") or 0)
+    return total
+
+
 def is_winner(coin: dict, now: float) -> str:
     """Empty = mine this book. Else skip reason."""
     farm = extract_farm_reason(coin)
@@ -145,8 +171,8 @@ async def mine_coin(http: httpx.AsyncClient, state: State, coin: dict) -> int:
         log.info("Skip mine %s — curve too long to reach launch", coin.get("symbol"))
         state.mark_tx_harvested(mint)
         return 0
+    # Oldest page, oldest-first — rank 1 is the first unique curve buy.
     oldest = list(reversed(all_rows[-config.EARLY_PAGE_LIMIT :]))
-    newest = all_rows[:120]
     skip = set(_PROGRAMS)
     skip.add(curve)
     skip.add(coin.get("associated_bonding_curve") or "")
@@ -157,17 +183,24 @@ async def mine_coin(http: httpx.AsyncClient, state: State, coin: dict) -> int:
 
     early: dict[str, dict] = {}
     rank = 0
-    for row in reversed(oldest):
+    for row in oldest:
         sig = row.get("signature") or ""
         if not sig or row.get("err"):
             continue
         await asyncio.sleep(0.22)
         tx = await _tx(sig)
-        for owner, side, sol, _delta in _moves(tx, mint):
-            if side != "buy" or owner in skip or _is_lp(owner, coin):
+        for owner, side, sol, delta in _moves(tx, mint):
+            if owner in skip or _is_lp(owner, coin):
+                continue
+            if side == "sell" and owner in early:
+                early[owner]["sold"] = 1
+                early[owner]["sol_out"] += sol
+                continue
+            if side != "buy":
                 continue
             if owner in early:
                 early[owner]["sol_in"] += sol
+                early[owner]["tokens"] += abs(delta)
                 continue
             rank += 1
             if rank > config.EARLY_MAX_RANK:
@@ -176,20 +209,20 @@ async def mine_coin(http: httpx.AsyncClient, state: State, coin: dict) -> int:
                 "rank": rank,
                 "sol_in": sol,
                 "sol_out": 0.0,
+                "tokens": abs(delta),
                 "sold": 0,
             }
 
-    for row in newest:
-        sig = row.get("signature") or ""
-        if not sig or row.get("err"):
+    for wallet, row in list(early.items()):
+        if row["rank"] > config.EARLY_MAX_RANK:
             continue
-        await asyncio.sleep(0.18)
-        tx = await _tx(sig)
-        for owner, side, sol, _delta in _moves(tx, mint):
-            if owner not in early or side != "sell":
-                continue
-            early[owner]["sold"] = 1
-            early[owner]["sol_out"] += sol
+        await asyncio.sleep(0.22)
+        try:
+            left = await token_left(wallet, mint)
+        except Exception:
+            continue
+        if sold_from_hold(row["tokens"], left):
+            row["sold"] = 1
 
     n = 0
     for wallet, row in early.items():
@@ -246,6 +279,29 @@ async def runner_pool(http: httpx.AsyncClient) -> list[dict]:
     return pool[:16]
 
 
+async def refresh_sold(state: State) -> int:
+    """Re-check bags we already mined — still holding or gone."""
+    flipped = 0
+    for row in state.early_pairs():
+        if int(row.get("sold") or 0):
+            continue
+        wallet = row.get("wallet") or ""
+        mint = row.get("mint") or ""
+        if not wallet or not mint:
+            continue
+        await asyncio.sleep(0.22)
+        try:
+            left = await token_left(wallet, mint)
+        except Exception:
+            continue
+        if sold_from_hold(0.0, left):
+            state.mark_early_sold(wallet, mint)
+            flipped += 1
+    if flipped:
+        log.info("Sold refresh marked %s wallets as dumped the bag", flipped)
+    return flipped
+
+
 async def cycle(http: httpx.AsyncClient, state: State) -> int:
     coins = await runner_pool(http)
     added = 0
@@ -254,6 +310,7 @@ async def cycle(http: httpx.AsyncClient, state: State) -> int:
             added += await mine_coin(http, state, coin)
         except Exception as exc:
             log.warning("mine %s failed: %s", coin.get("symbol"), exc)
+    await refresh_sold(state)
     board = state.early_board()
     log.info(
         "Gather cycle +%s hits · %s wallets · %s runners · %s sold",
