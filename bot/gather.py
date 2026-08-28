@@ -110,28 +110,25 @@ def _moves(tx: dict, mint: str) -> list[tuple[str, str, float, float]]:
     return out
 
 
-async def genesis_pages(curve: str) -> tuple[list[dict], list[dict], bool]:
-    """Oldest page, newest page, True if we reached curve start."""
+async def genesis_pages(curve: str) -> tuple[list[dict], bool]:
+    """Newest-first sig rows, True if we reached curve start."""
     before = ""
-    newest: list[dict] = []
-    last: list[dict] = []
+    all_rows: list[dict] = []
     genesis = False
-    for i in range(config.EARLY_SIG_PAGES):
+    for _ in range(config.EARLY_SIG_PAGES):
         rows = await _sigs(curve, before)
         await asyncio.sleep(0.25)
         if not rows:
             genesis = True
             break
-        if i == 0:
-            newest = rows
-        last = rows
+        all_rows.extend(rows)
         if len(rows) < config.EARLY_PAGE_LIMIT:
             genesis = True
             break
         before = rows[-1].get("signature") or ""
         if not before:
             break
-    return last, newest, genesis
+    return all_rows, genesis
 
 
 async def mine_coin(http: httpx.AsyncClient, state: State, coin: dict) -> int:
@@ -143,11 +140,13 @@ async def mine_coin(http: httpx.AsyncClient, state: State, coin: dict) -> int:
     why = is_winner(coin, time.time())
     if why:
         return 0
-    oldest, newest, genesis = await genesis_pages(curve)
-    if not genesis:
+    all_rows, genesis = await genesis_pages(curve)
+    if not genesis or not all_rows:
         log.info("Skip mine %s — curve too long to reach launch", coin.get("symbol"))
         state.mark_tx_harvested(mint)
         return 0
+    oldest = list(reversed(all_rows[-config.EARLY_PAGE_LIMIT :]))
+    newest = all_rows[:120]
     skip = set(_PROGRAMS)
     skip.add(curve)
     skip.add(coin.get("associated_bonding_curve") or "")
