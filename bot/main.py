@@ -4,7 +4,7 @@ import asyncio
 import logging
 import sys
 import time
-from . import config, health, paper
+from . import config, gather, health, paper
 from .alpha import all_alphas, copy_alphas
 from .attention import Attention
 from .copy import poll_all as copy_poll
@@ -24,6 +24,8 @@ from .telegram import (
     format_copy_exit,
     format_copy_hit,
     format_copy_session,
+    format_early_board,
+    format_early_boot,
     format_gather,
     format_paper_book,
     format_paper_fill,
@@ -79,7 +81,7 @@ async def run() -> None:
     last_paper_report = time.time()
     last_feed_log = 0.0
     last_wallet_harvest = 0.0
-    last_gather_report = time.time()
+    last_gather_report = 0.0
 
     health.STATUS["ok"] = True
     health.start(config.PORT)
@@ -92,7 +94,10 @@ async def run() -> None:
         except Exception as exc:
             log.warning("Initial attention refresh failed: %s", exc)
 
-        if config.COPY_MODE:
+        if config.GATHER_MODE:
+            log.info("Gather loop. early buyers on runners. paper off.")
+            await send(http, format_early_boot())
+        elif config.COPY_MODE:
             log.info(
                 "Copy loop. paper %s SOL book %s. %s copy / %s observe wallets",
                 f"{(paper_snap or {}).get('equity') or config.PAPER_START_SOL:.3f}",
@@ -108,6 +113,28 @@ async def run() -> None:
         while True:
             loop_start = time.time()
             try:
+                if config.GATHER_MODE:
+                    if time.time() - last_wallet_harvest >= config.GATHER_SEC:
+                        added = await gather.cycle(http, state)
+                        last_wallet_harvest = time.time()
+                        board = state.early_board()
+                        health.STATUS["smart_wallets"] = board.get("wallets") or 0
+                        health.STATUS["posted"] = board.get("hits") or 0
+                        health.STATUS["watches"] = board.get("mints") or 0
+                        if added:
+                            log.info("Gather +%s", added)
+                    if time.time() - last_gather_report >= config.WALLET_REPORT_SEC:
+                        board = state.early_board()
+                        ok = await send(http, format_early_board(board))
+                        if ok:
+                            log.info(
+                                "Early list dump %s wallets",
+                                board.get("wallets"),
+                            )
+                        last_gather_report = time.time()
+                    health.STATUS["last_error"] = ""
+                    await asyncio.sleep(20)
+                    continue
                 if config.COPY_MODE:
                     hits, exits = await copy_poll(http, state)
                     for hit in hits:

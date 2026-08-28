@@ -169,6 +169,64 @@ def _fmt_sol(value: float) -> str:
     return f"{sign}{value:.3f} SOL"
 
 
+def _short_wallet(w: str) -> str:
+    w = w or ""
+    if len(w) > 10:
+        return f"{w[:4]}…{w[-4:]}"
+    return w
+
+
+def format_early_boot() -> str:
+    return "\n".join(
+        [
+            "<b>wallet gather</b>",
+            "no paper. collecting wallets that bought runners at launch (low MC).",
+            "a later sell on that same run counts as PnL.",
+            "",
+            f"filters: ATH ≥ ${_esc(f'{config.EARLY_MIN_ATH:,.0f}')} · first {config.EARLY_MAX_RANK} unique curve buyers · skip farms",
+            "<i>list dumps here as it fills. copy starts after we pick the list.</i>",
+        ]
+    )
+
+
+def format_early_board(board: dict) -> str:
+    lines = [
+        "<b>early-buyer list</b>",
+        f"{int(board.get('wallets') or 0)} wallets · {int(board.get('mints') or 0)} runners · "
+        f"{int(board.get('hits') or 0)} hits · {int(board.get('sold') or 0)} sold into the run",
+        "",
+    ]
+    top = board.get("top") or []
+    if not top:
+        lines.append("still mining genesis buyers. nothing ranked yet.")
+        return "\n".join(lines)
+    for i, row in enumerate(top[:15], start=1):
+        w = row.get("wallet") or ""
+        link = (
+            f"<a href=\"https://solscan.io/account/{_esc(w)}\">{_esc(_short_wallet(w))}</a>"
+        )
+        pnl = float(row.get("pnl") or 0)
+        lines.append(
+            f"{i}. {link}  <b>{int(row.get('n') or 0)} runs</b> · "
+            f"{int(row.get('sold_n') or 0)} sold · avg rank {float(row.get('avg_rank') or 0):.0f} · "
+            f"{_esc(_fmt_sol(pnl))}"
+        )
+        bits = []
+        for run in row.get("runs") or []:
+            sym = (run.get("symbol") or "?").strip() or "?"
+            tag = "sold" if int(run.get("sold") or 0) else "held"
+            ath = float(run.get("ath_mc") or 0)
+            bits.append(
+                f"${_esc(sym)} r{int(run.get('buy_rank') or 0)} {tag} ATH {_esc(_fmt_usd(ath))}"
+            )
+        if bits:
+            lines.append("   " + " · ".join(bits[:4]))
+    lines.append(
+        "\n<i>rank 1 = first unique buy on the curve. sold = they dumped that runner later. no paper yet.</i>"
+    )
+    return "\n".join(lines)
+
+
 def format_paper_fill(fill, snap: dict) -> str:
     pos = fill.pos
     url = pos.get("url") or ""

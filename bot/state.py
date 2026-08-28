@@ -172,6 +172,19 @@ class State:
                     seen_at INTEGER,
                     PRIMARY KEY (wallet, mint)
                 );
+                CREATE TABLE IF NOT EXISTS early_hits (
+                    wallet TEXT NOT NULL,
+                    mint TEXT NOT NULL,
+                    symbol TEXT,
+                    buy_rank INTEGER,
+                    sol_in REAL,
+                    sol_out REAL,
+                    sold INTEGER,
+                    ath_mc REAL,
+                    seen_at INTEGER,
+                    PRIMARY KEY (wallet, mint)
+                );
+                CREATE INDEX IF NOT EXISTS idx_early_wallet ON early_hits(wallet);
                 CREATE TABLE IF NOT EXISTS tape (
                     mint TEXT PRIMARY KEY,
                     symbol TEXT,
@@ -614,6 +627,7 @@ class State:
             n = int(row["n"] if row else 0)
             con.execute("DELETE FROM smart_wallet_mints")
             con.execute("DELETE FROM tx_harvested")
+            con.execute("DELETE FROM early_hits")
         return n
 
     def drop_wallets_from_mint(self, mint: str) -> int:
@@ -653,6 +667,110 @@ class State:
                 "SELECT COUNT(DISTINCT wallet) n FROM smart_wallet_mints"
             ).fetchone()
         return int(row["n"] if row else 0)
+
+    def note_early_hit(
+        self,
+        wallet: str,
+        mint: str,
+        symbol: str,
+        buy_rank: int,
+        sol_in: float,
+        sol_out: float,
+        sold: int,
+        ath_mc: float,
+    ) -> None:
+        wallet = (wallet or "").strip()
+        mint = (mint or "").strip()
+        if not wallet or not mint:
+            return
+        with self._conn() as con:
+            con.execute(
+                """
+                INSERT INTO early_hits(
+                    wallet, mint, symbol, buy_rank, sol_in, sol_out, sold, ath_mc, seen_at
+                ) VALUES (?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(wallet, mint) DO UPDATE SET
+                    buy_rank = MIN(early_hits.buy_rank, excluded.buy_rank),
+                    sol_in = MAX(early_hits.sol_in, excluded.sol_in),
+                    sol_out = MAX(early_hits.sol_out, excluded.sol_out),
+                    sold = MAX(early_hits.sold, excluded.sold),
+                    ath_mc = MAX(COALESCE(early_hits.ath_mc, 0), COALESCE(excluded.ath_mc, 0)),
+                    symbol = COALESCE(excluded.symbol, early_hits.symbol)
+                """,
+                (
+                    wallet,
+                    mint,
+                    (symbol or "").upper(),
+                    int(buy_rank),
+                    float(sol_in or 0),
+                    float(sol_out or 0),
+                    int(sold),
+                    float(ath_mc or 0),
+                    int(time.time()),
+                ),
+            )
+
+    def early_board(self, limit: int = 20) -> dict:
+        with self._conn() as con:
+            totals = con.execute(
+                """
+                SELECT COUNT(DISTINCT wallet) wallets,
+                       COUNT(*) hits,
+                       COUNT(DISTINCT mint) mints,
+                       SUM(sold) sold
+                FROM early_hits
+                """
+            ).fetchone()
+            rows = con.execute(
+                """
+                SELECT wallet,
+                       COUNT(*) AS n,
+                       SUM(sold) AS sold_n,
+                       AVG(buy_rank) AS avg_rank,
+                       SUM(sol_in) AS sol_in,
+                       SUM(sol_out) AS sol_out,
+                       MAX(ath_mc) AS best_ath
+                FROM early_hits
+                GROUP BY wallet
+                ORDER BY sold_n DESC, n DESC, avg_rank ASC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        top = []
+        with self._conn() as con:
+            for row in rows:
+                w = row["wallet"]
+                runs = con.execute(
+                    """
+                    SELECT mint, symbol, buy_rank, sold, ath_mc, sol_in, sol_out
+                    FROM early_hits WHERE wallet = ?
+                    ORDER BY sold DESC, buy_rank ASC LIMIT 4
+                    """,
+                    (w,),
+                ).fetchall()
+                sol_in = float(row["sol_in"] or 0)
+                sol_out = float(row["sol_out"] or 0)
+                top.append(
+                    {
+                        "wallet": w,
+                        "n": int(row["n"] or 0),
+                        "sold_n": int(row["sold_n"] or 0),
+                        "avg_rank": float(row["avg_rank"] or 0),
+                        "sol_in": sol_in,
+                        "sol_out": sol_out,
+                        "pnl": sol_out - sol_in,
+                        "best_ath": float(row["best_ath"] or 0),
+                        "runs": [dict(r) for r in runs],
+                    }
+                )
+        return {
+            "wallets": int(totals["wallets"] or 0),
+            "hits": int(totals["hits"] or 0),
+            "mints": int(totals["mints"] or 0),
+            "sold": int(totals["sold"] or 0),
+            "top": top,
+        }
 
     def already_posted(self, mint: str) -> bool:
         with self._conn() as con:
