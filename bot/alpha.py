@@ -1,12 +1,7 @@
-"""Alpha wallet watchlist. Scores are research notes, not automatic size.
+"""Alpha wallet watchlist.
 
-Seed profile AkK5… (pump username martinshkreli, 6.0k followers) holds ~1.46k SOL
-and is live on-chain, but Kolscan prints 0 trades/PnL and it has created 0 pump
-coins. Treat as whale/observe until we see repeated pump buys with hold time.
-
-Copy book is June-2026 KOL Explorer names that still have SOL and a tx in the
-last hour as of 2026-08-25 research. Bots (Cented-class, 400+/day) are observe
-only — an 8s poll cannot copy them.
+Copy-exit book: buy when they buy, flatten when they sell. Spray OBS wallets
+and broke/low-fill names dropped so RPC spends on wallets that actually print.
 """
 
 from __future__ import annotations
@@ -64,15 +59,6 @@ WATCHLIST: tuple[Alpha, ...] = (
         pnl_30d_usd=113_409,
     ),
     Alpha(
-        "jason",
-        "ACTbvbNm5qTLuofNRPxFPMtHAAtdH1CtzhCZatYHy831",
-        False,
-        0.85,
-        "copy-5sol: 0 fills, cashback spray only — observe",
-        wr=0.338,
-        pnl_30d_usd=71_173,
-    ),
-    Alpha(
         "samsrep",
         "CUHBzSPSaNS3tArEtM3maSV6pNdJhHJFYZpurPPK9P7H",
         True,
@@ -80,15 +66,6 @@ WATCHLIST: tuple[Alpha, ...] = (
         "35.7% WR but clustered 15–60x — copy small, trail long",
         wr=0.357,
         pnl_30d_usd=161_357,
-    ),
-    Alpha(
-        "trenchman",
-        "Hw5UKBU5k3YudnGwaykj5E8cYUidNMPuEewRRar5Xoc7",
-        True,
-        0.85,
-        "Repeated 15–23x on $200–300 entries, 163 SOL, live",
-        wr=0.0,
-        pnl_30d_usd=0,
     ),
     Alpha(
         "kaythedoc",
@@ -107,33 +84,6 @@ WATCHLIST: tuple[Alpha, ...] = (
         "Jun-26 #6, 49% WR, $124k/30d, 40 SOL",
         wr=0.492,
         pnl_30d_usd=124_343,
-    ),
-    Alpha(
-        "tdmilky",
-        "AuPp4YTMTyqxYXQnHc5KUc6pUuCSsHQpBJhgnD45yqrf",
-        True,
-        0.7,
-        "Jun-26 #5, 47% WR — only 3.4 SOL left, size down",
-        wr=0.471,
-        pnl_30d_usd=132_819,
-    ),
-    Alpha(
-        "martinshkreli",
-        "AkK5BtfBhj3cJi1f9LVXodbBLxRiePqffm5uiQYpDYQr",
-        False,
-        0.5,
-        "Seed profile: 6.0k pump followers, 1463 SOL, 0 created coins, Kolscan 0 PnL — observe",
-        wr=0.0,
-        pnl_30d_usd=0,
-    ),
-    Alpha(
-        "cented",
-        "CyaE1VxvBrahnPWkqm5VsdCvyS2QmNht2UFrKJHga54o",
-        False,
-        0.5,
-        "Best 30d $615k / 64.5% WR but 12k trades — too fast to copy at 8s poll",
-        wr=0.645,
-        pnl_30d_usd=614_967,
     ),
 )
 

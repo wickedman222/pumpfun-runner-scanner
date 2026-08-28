@@ -8,8 +8,37 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from bot import config
-from bot.copy import copy_size, entry_fail
+from bot.copy import copy_size, entry_fail, token_move
 from bot.state import State
+
+PUMP = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+WALLET = "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9"
+MINT = "Mint111111111111111111111111111111111111111"
+
+
+def tx(pre: float, post: float) -> dict:
+    return {
+        "result": {
+            "meta": {
+                "err": None,
+                "preTokenBalances": [
+                    {
+                        "mint": MINT,
+                        "owner": WALLET,
+                        "uiTokenAmount": {"uiAmount": pre},
+                    }
+                ],
+                "postTokenBalances": [
+                    {
+                        "mint": MINT,
+                        "owner": WALLET,
+                        "uiTokenAmount": {"uiAmount": post},
+                    }
+                ],
+            },
+            "transaction": {"message": {"accountKeys": [WALLET, PUMP, MINT]}},
+        }
+    }
 
 
 def coin(mc, **kw):
@@ -54,6 +83,13 @@ def main() -> None:
     assert not st.copy_seen("w1", "mintA")
     st.note_copy_hit("w1", "mintA")
     assert st.copy_seen("w1", "mintA")
+
+    mint, side = token_move(tx(0, 1000), WALLET)
+    assert mint == MINT and side == "buy"
+    mint, side = token_move(tx(1000, 10), WALLET)
+    assert mint == MINT and side == "sell"
+    mint, side = token_move(tx(0, 0), WALLET)
+    assert side == ""
 
     print("copy rules ok")
 

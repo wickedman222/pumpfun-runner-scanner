@@ -205,8 +205,16 @@ def _sell(state: State, pos: dict, frac_of_original: float, reason: str, mc: flo
     )
 
 
+def flatten(state: State, pos: dict, coin: dict, reason: str) -> Fill | None:
+    mc = float(coin.get("usd_market_cap") or pos.get("last_mc") or 0)
+    left = float(pos.get("remaining_frac") or 0)
+    if left <= 0 or mc <= 0:
+        return None
+    return _sell(state, pos, left, reason, mc)
+
+
 def decide(pos: dict, coin: dict) -> list[tuple[float, str]]:
-    """Moonbag hold test: scale out at 2x/4x/10x. Never flatten."""
+    """Clip 2x/4x/10x while they hold. Flatten stale bags we missed the dump on."""
     mc = float(coin.get("usd_market_cap") or 0)
     if mc <= 0:
         return []
@@ -214,10 +222,20 @@ def decide(pos: dict, coin: dict) -> list[tuple[float, str]]:
     left = float(pos.get("remaining_frac") or 0)
     if left <= 0:
         return []
+    opened = int(pos.get("opened_at") or 0)
+    held = time.time() - opened if opened else 0
     tp1 = bool(int(pos.get("tp1_hit") or 0))
     tp2 = bool(int(pos.get("tp2_hit") or 0))
     tp3 = bool(int(pos.get("tp3_hit") or 0))
     actions: list[tuple[float, str]] = []
+
+    if (
+        config.PAPER_STALE_SEC > 0
+        and not tp1
+        and held >= config.PAPER_STALE_SEC
+        and multiple < config.PAPER_STALE_MULT
+    ):
+        return [(left, f"stale bag {multiple:.2f}x")]
 
     if not tp1 and multiple >= config.PAPER_TP1_MULT:
         take = min(config.PAPER_TP1_SELL, left)

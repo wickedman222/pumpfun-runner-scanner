@@ -185,10 +185,8 @@ def format_paper_fill(fill, snap: dict) -> str:
             f"path {_esc(pos.get('path') or '—')}",
             "",
             "<b>PLAN</b>",
-            "hold — no stop, no trail",
-            f"sell {int(config.PAPER_TP1_SELL * 100)}% at {config.PAPER_TP1_MULT:.1f}x",
-            f"sell {int(config.PAPER_TP2_SELL * 100)}% at {config.PAPER_TP2_MULT:.1f}x",
-            f"moonbag {int((1 - config.PAPER_TP1_SELL - config.PAPER_TP2_SELL) * 100)}% rides · clip some at {config.PAPER_TP3_MULT:.0f}x",
+            "flatten when the alpha sells",
+            f"clip {int(config.PAPER_TP1_SELL * 100)}% at {config.PAPER_TP1_MULT:.1f}x / {int(config.PAPER_TP2_SELL * 100)}% at {config.PAPER_TP2_MULT:.1f}x if it rips first",
         ]
     else:
         left = float(pos.get("remaining_frac") or 0)
@@ -298,7 +296,7 @@ def format_copy_boot(snap: dict | None, alphas: list) -> str:
     eq = float((snap or {}).get("equity") or 2.0)
     lines = [
         "<b>copy paper</b>",
-        f"equity <b>{eq:.3f} SOL</b> · start {config.PAPER_START_SOL:.3f} · {config.PAPER_SIZE_FIXED:.1f} SOL/trade · moonbag hold",
+        f"equity <b>{eq:.3f} SOL</b> · start {config.PAPER_START_SOL:.3f} · {config.PAPER_SIZE_FIXED:.1f} SOL/trade · copy their exit",
         "",
         "<b>watchlist</b>",
     ]
@@ -322,6 +320,19 @@ def format_copy_hit(hit, snap: dict) -> str:
         _esc(hit.thesis),
         f"size <b>{hit.size_sol:.3f} SOL</b> ({hit.frac*100:.1f}% eq) · MC ${_esc(f'{usd:,.0f}')}",
         f"invalidate: {_esc(hit.invalidation)}",
+        "",
+        f"equity <b>{snap['equity']:.3f} SOL</b>  cash {snap['cash']:.3f}  open {len(snap['open'])}",
+    ]
+    return "\n".join(lines)
+
+
+def format_copy_exit(ex, snap: dict) -> str:
+    coin = ex.coin
+    usd = float(coin.get("usd_market_cap") or 0)
+    lines = [
+        "<b>COPY EXIT</b>  (paper)",
+        f"${_esc(coin.get('symbol'))}  {_esc(ex.reason)}",
+        f"MC ${_esc(f'{usd:,.0f}')} · {_esc(ex.alpha.name)} sold",
         "",
         f"equity <b>{snap['equity']:.3f} SOL</b>  cash {snap['cash']:.3f}  open {len(snap['open'])}",
     ]

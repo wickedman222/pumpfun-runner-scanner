@@ -21,6 +21,7 @@ from .pump import (
 from .state import State
 from .telegram import (
     format_copy_boot,
+    format_copy_exit,
     format_copy_hit,
     format_copy_session,
     format_gather,
@@ -108,9 +109,11 @@ async def run() -> None:
             loop_start = time.time()
             try:
                 if config.COPY_MODE:
-                    hits = await copy_poll(http, state)
+                    hits, exits = await copy_poll(http, state)
                     for hit in hits:
                         await _copy_fill(http, state, hit)
+                    for ex in exits:
+                        await _copy_exit(http, state, ex)
                     if config.PAPER_ENABLED:
                         await _manage_paper(http, state)
                     health.STATUS["paper_equity"] = round(
@@ -295,6 +298,25 @@ async def _copy_fill(http, state: State, hit) -> None:
     snap = paper.snapshot(state)
     health.STATUS["paper_equity"] = round(snap["equity"], 4)
     await send(http, format_copy_hit(hit, snap))
+    await send(http, format_paper_fill(fill, snap))
+
+
+async def _copy_exit(http, state: State, ex) -> None:
+    pos = state.paper_position(ex.mint)
+    if not pos:
+        return
+    fill = paper.flatten(state, pos, ex.coin, ex.reason)
+    if not fill:
+        return
+    snap = paper.snapshot(state)
+    health.STATUS["paper_equity"] = round(snap["equity"], 4)
+    log.info(
+        "PAPER FLATTEN %s %s @ $%.0f",
+        pos.get("symbol"),
+        ex.reason,
+        float(ex.coin.get("usd_market_cap") or 0),
+    )
+    await send(http, format_copy_exit(ex, snap))
     await send(http, format_paper_fill(fill, snap))
 
 

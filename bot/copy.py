@@ -1,7 +1,7 @@
-"""Copy-trade pump.fun buys from the alpha watchlist.
+"""Copy-trade pump.fun buys AND sells from the alpha watchlist.
 
-We cannot outrun snipers. Edge is: a researched human KOL buys a still-cheap
-curve book, we arrive within ~3 minutes, size by conviction, keep 25% cash.
+Holding after the KOL dumps is how the last book bled. Edge: same buy,
+same exit. Clip 2x/4x if it rips while they still hold.
 """
 
 from __future__ import annotations
@@ -40,8 +40,17 @@ class CopyHit:
     invalidation: str
 
 
+@dataclass
+class CopyExit:
+    alpha: Alpha
+    mint: str
+    sig: str
+    ts: float
+    coin: dict
+    reason: str
+
+
 async def _rpc(_http: httpx.AsyncClient, method: str, params: list) -> dict | None:
-    # Dedicated RPC client — the pump.fun Origin on `http` 403s public Solana RPC.
     return await rpc(method, params)
 
 
@@ -51,33 +60,40 @@ def _pubkey(item) -> str:
     return str(item or "")
 
 
-def _mint_bought(tx: dict, wallet: str) -> str:
+def _amt(b: dict) -> float:
+    return float(((b.get("uiTokenAmount") or {}).get("uiAmount")) or 0)
+
+
+def token_move(tx: dict, wallet: str) -> tuple[str, str]:
+    """Largest pump/pumpswap token delta for this wallet. ('mint','buy'|'sell') or ('','')."""
     res = (tx or {}).get("result") or {}
     meta = res.get("meta") or {}
     if not res or meta.get("err"):
-        return ""
+        return "", ""
     keys = ((res.get("transaction") or {}).get("message") or {}).get("accountKeys") or []
     pubs = [_pubkey(k) for k in keys]
-    if not pubs or pubs[0] != wallet:
-        return ""
     if PUMP_PROGRAM not in pubs and PUMPSWAP not in pubs:
-        return ""
+        return "", ""
     pre = {
-        (b.get("mint"), b.get("owner")): float(
-            ((b.get("uiTokenAmount") or {}).get("uiAmount")) or 0
-        )
+        (b.get("mint"), b.get("owner")): _amt(b)
         for b in (meta.get("preTokenBalances") or [])
     }
-    for b in meta.get("postTokenBalances") or []:
-        mint = b.get("mint") or ""
-        owner = b.get("owner") or ""
-        if not mint or mint == WSOL:
+    post_rows = meta.get("postTokenBalances") or []
+    post = {(b.get("mint"), b.get("owner")): _amt(b) for b in post_rows}
+    keys_set = set(pre) | set(post)
+    best_mint = ""
+    best_side = ""
+    best_abs = 1.0
+    for mint, owner in keys_set:
+        if not mint or mint == WSOL or owner != wallet:
             continue
-        after = float(((b.get("uiTokenAmount") or {}).get("uiAmount")) or 0)
-        before = float(pre.get((mint, owner), 0) or 0)
-        if after > before + 1:
-            return mint
-    return ""
+        delta = float(post.get((mint, owner), 0) or 0) - float(pre.get((mint, owner), 0) or 0)
+        if abs(delta) <= best_abs:
+            continue
+        best_abs = abs(delta)
+        best_mint = str(mint)
+        best_side = "buy" if delta > 0 else "sell"
+    return best_mint, best_side
 
 
 def copy_size(equity: float, cash: float, n_alphas: int, conv: float, peak: float) -> float:
@@ -114,7 +130,7 @@ def entry_fail(coin: dict, now: float, lag_sec: float) -> str:
 
 async def scan_wallet(
     http: httpx.AsyncClient, state: State, alpha: Alpha
-) -> list[tuple[str, str, float]]:
+) -> list[tuple[str, str, float, str]]:
     cursor = state.copy_cursor(alpha.address)
     js = await _rpc(
         http,
@@ -127,13 +143,12 @@ async def scan_wallet(
     rows = js.get("result") or []
     newest = (rows[0].get("signature") or "") if rows else ""
     if not cursor:
-        # First run: pin the tip. Do not copy history. Empty pin does not count.
         if not newest:
             return []
         state.set_copy_cursor(alpha.address, newest)
         log.info("Cursor %s ready", alpha.name)
         return []
-    out: list[tuple[str, str, float]] = []
+    out: list[tuple[str, str, float, str]] = []
     for row in rows:
         sig = row.get("signature") or ""
         if not sig or sig == cursor:
@@ -145,10 +160,10 @@ async def scan_wallet(
             "getTransaction",
             [sig, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0}],
         )
-        mint = _mint_bought(txj or {}, alpha.address)
+        mint, side = token_move(txj or {}, alpha.address)
         ts = float(row.get("blockTime") or 0)
-        if mint:
-            out.append((mint, sig, ts))
+        if mint and side:
+            out.append((mint, sig, ts, side))
         await _sleep()
     if newest and newest != cursor:
         state.set_copy_cursor(alpha.address, newest)
@@ -158,10 +173,10 @@ async def scan_wallet(
 async def _sleep() -> None:
     import asyncio
 
-    await asyncio.sleep(0.7)
+    await asyncio.sleep(0.45)
 
 
-async def consider(
+async def consider_buy(
     http: httpx.AsyncClient,
     state: State,
     alpha: Alpha,
@@ -170,9 +185,6 @@ async def consider(
     ts: float,
     now: float,
 ) -> CopyHit | None:
-    if not alpha.copy:
-        log.info("Observe %s buy %s (no copy)", alpha.name, mint[:8])
-        return None
     if state.already_posted(mint) or state.paper_position(mint) or state.copy_seen(
         alpha.address, mint
     ):
@@ -188,9 +200,7 @@ async def consider(
         state.note_copy_hit(alpha.address, mint)
         return None
     state.note_copy_hit(alpha.address, mint)
-    n = state.copy_hit_count(mint, window_sec=20 * 60)
-    snap_eq = float((state.paper_wallet() or {}).get("cash_sol") or 0)
-    # equity approx cash if no marks; caller should pass snapshot. Use cash as floor.
+    n = max(1, state.copy_hit_count(mint, window_sec=20 * 60))
     from . import paper as paper_mod
 
     snap = paper_mod.snapshot(state)
@@ -208,7 +218,7 @@ async def consider(
         f"bought ${(coin.get('usd_market_cap') or 0):,.0f} "
         f"lag {lag:.0f}s"
     )
-    inv = "none — moonbag hold, no stop"
+    inv = f"flatten when {alpha.name} sells"
     return CopyHit(
         alpha=alpha,
         mint=mint,
@@ -223,29 +233,71 @@ async def consider(
     )
 
 
-async def poll_all(http: httpx.AsyncClient, state: State) -> list[CopyHit]:
+async def consider_exit(
+    http: httpx.AsyncClient,
+    state: State,
+    alpha: Alpha,
+    mint: str,
+    sig: str,
+    ts: float,
+) -> CopyExit | None:
+    pos = state.paper_position(mint)
+    if not pos or float(pos.get("remaining_frac") or 0) <= 0:
+        return None
+    if (pos.get("status") or "") not in ("open", "moonbag"):
+        return None
+    coin = await fetch_coin(http, mint)
+    if not coin:
+        coin = {
+            "mint": mint,
+            "symbol": pos.get("symbol") or "",
+            "usd_market_cap": pos.get("last_mc") or 0,
+            "url": pos.get("url") or "",
+        }
+    reason = f"alpha exit {alpha.name}"
+    log.info("COPY EXIT %s %s — %s", alpha.name, pos.get("symbol"), reason)
+    return CopyExit(
+        alpha=alpha, mint=mint, sig=sig, ts=ts, coin=coin, reason=reason
+    )
+
+
+async def poll_all(
+    http: httpx.AsyncClient, state: State
+) -> tuple[list[CopyHit], list[CopyExit]]:
     now = time.time()
     hits: list[CopyHit] = []
-    seen_mint: set[str] = set()
+    exits: list[CopyExit] = []
+    seen_buy: set[str] = set()
+    seen_sell: set[str] = set()
     from .alpha import copy_alphas
 
     for alpha in copy_alphas():
         try:
-            buys = await scan_wallet(http, state, alpha)
+            moves = await scan_wallet(http, state, alpha)
         except Exception as exc:
             log.warning("scan %s failed: %s", alpha.name, exc)
             continue
-        for mint, sig, ts in buys:
-            if not alpha.copy:
-                log.info("Observe %s tx %s %s", alpha.name, mint[:8], sig[:8])
+        dumped = {m for m, _, _, s in moves if s == "sell"}
+        for mint, sig, ts, side in moves:
+            if side == "sell":
+                if mint in seen_sell:
+                    continue
+                ex = await consider_exit(http, state, alpha, mint, sig, ts)
+                if ex:
+                    seen_sell.add(mint)
+                    exits.append(ex)
                 continue
-            if mint in seen_mint:
+            if mint in dumped:
+                log.info("Skip copy %s %s — dumped in same window", alpha.name, mint[:8])
                 state.note_copy_hit(alpha.address, mint)
                 continue
-            hit = await consider(http, state, alpha, mint, sig, ts, now)
-            seen_mint.add(mint)
+            if mint in seen_buy:
+                state.note_copy_hit(alpha.address, mint)
+                continue
+            hit = await consider_buy(http, state, alpha, mint, sig, ts, now)
+            seen_buy.add(mint)
             if hit:
                 hits.append(hit)
         await _sleep()
-    log.info("Copy poll %s new buys", len(hits))
-    return hits
+    log.info("Copy poll %s buys / %s exits", len(hits), len(exits))
+    return hits, exits

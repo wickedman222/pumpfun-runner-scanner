@@ -87,6 +87,12 @@ def main() -> None:
     acts = decide(pos, coin("m2", 22_000))
     assert acts == [], acts
 
+    dead = dict(pos)
+    dead["entry_mc"] = 18_000
+    dead["opened_at"] = int(time.time()) - 50 * 60
+    acts = decide(dead, coin("m2", 2_000))
+    assert acts and acts[0][1].startswith("stale bag"), acts
+
     print("paper rules ok")
 
 
