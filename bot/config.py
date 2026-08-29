@@ -150,16 +150,17 @@ WALLET_MAX_AGE_SEC = _int("WALLET_MAX_AGE_SEC", 90 * 60)
 WALLET_BOOK_ID = _env("WALLET_BOOK_ID", "early-1")
 
 # --- Paper book (no real SOL) ---
-PAPER_ENABLED = _int("PAPER_ENABLED", 0) == 1
+PAPER_ENABLED = _int("PAPER_ENABLED", 1) == 1
 PAPER_START_SOL = _float("PAPER_START_SOL", 5.0)
 # Bump this string to flatten the paper book and start from PAPER_START_SOL again.
-PAPER_BOOK_ID = _env("PAPER_BOOK_ID", "copy-exit-1")
+PAPER_BOOK_ID = _env("PAPER_BOOK_ID", "early-copy-1")
 PAPER_SIZE_FIXED = _float("PAPER_SIZE_FIXED", 0.30)
 PAPER_SIZE_FRAC = _float("PAPER_SIZE_FRAC", 0.0)  # unused — size is PAPER_SIZE_FIXED
 PAPER_SIZE_MIN = _float("PAPER_SIZE_MIN", 0.30)
 PAPER_SIZE_MAX = _float("PAPER_SIZE_MAX", 0.30)
 PAPER_MAX_OPEN = _int("PAPER_MAX_OPEN", 24)
-COPY_MODE = _int("COPY_MODE", 0) == 1
+COPY_MODE = _int("COPY_MODE", 1) == 1
+COPY_WATCH_N = _int("COPY_WATCH_N", 12)
 COPY_MAX_LAG_SEC = _int("COPY_MAX_LAG_SEC", 120)
 COPY_MIN_MC = _float("COPY_MIN_MC", 8_000)
 COPY_MAX_MC = _float("COPY_MAX_MC", 50_000)

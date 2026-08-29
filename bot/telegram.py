@@ -176,17 +176,25 @@ def _short_wallet(w: str) -> str:
     return w
 
 
-def format_early_boot() -> str:
-    return "\n".join(
-        [
-            "<b>wallet gather</b>",
-            "no paper. collecting wallets that bought runners at launch (low MC).",
-            "a later sell on that same run counts as PnL.",
-            "",
-            f"filters: ATH ≥ ${_esc(f'{config.EARLY_MIN_ATH:,.0f}')} · first {config.EARLY_MAX_RANK} unique curve buyers · skip farms",
-            "<i>list dumps here as it fills. copy starts after we pick the list.</i>",
-        ]
+def format_early_boot(snap: dict | None = None, watches: list | None = None) -> str:
+    eq = float((snap or {}).get("equity") or config.PAPER_START_SOL)
+    lines = [
+        "<b>early-copy live</b>",
+        "gather keeps mining launch buyers. paper copies the current top list (new buys only).",
+        f"equity <b>{eq:.3f} SOL</b> · {config.PAPER_SIZE_FIXED:.1f} SOL/trade · flatten when they sell",
+        "",
+        "<b>copying now</b>",
+    ]
+    if not watches:
+        lines.append("waiting on ranked wallets.")
+    else:
+        for a in watches:
+            lines.append(f"• {_esc(a.name)}  {_esc(a.why)}")
+            lines.append(f"  <code>{_esc(a.address)}</code>")
+    lines.append(
+        "\n<i>watchlist refreshes as gather finds better wallets. no historical copy.</i>"
     )
+    return "\n".join(lines)
 
 
 def format_early_board(board: dict) -> str:
@@ -222,7 +230,7 @@ def format_early_board(board: dict) -> str:
         if bits:
             lines.append("   " + " · ".join(bits[:4]))
     lines.append(
-        "\n<i>rank 1 = first unique buy on the curve. sold = they dumped that runner later. no paper yet.</i>"
+        "\n<i>rank 1 = first unique curve buy. sold = they dumped that runner. paper copies the top of this list live.</i>"
     )
     return "\n".join(lines)
 

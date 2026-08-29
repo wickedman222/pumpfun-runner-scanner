@@ -261,6 +261,69 @@ async def consider_exit(
     )
 
 
+def pick_early_copy(state: State) -> list[Alpha]:
+    """Top gathered wallets: sold the rip, preferably on more than one runner."""
+    rows = (state.early_board(limit=60).get("top") or [])
+    strong = [
+        r
+        for r in rows
+        if int(r.get("n") or 0) >= 2 and int(r.get("sold_n") or 0) >= 1
+    ]
+    used = {r.get("wallet") for r in strong}
+    if len(strong) < config.COPY_WATCH_N:
+        strong.extend(
+            r
+            for r in rows
+            if r.get("wallet") not in used and int(r.get("sold_n") or 0) >= 1
+        )
+        used = {r.get("wallet") for r in strong}
+    if len(strong) < config.COPY_WATCH_N:
+        strong.extend(r for r in rows if r.get("wallet") not in used)
+    out: list[Alpha] = []
+    for r in strong[: config.COPY_WATCH_N]:
+        w = str(r.get("wallet") or "")
+        if not w:
+            continue
+        n = max(1, int(r.get("n") or 0))
+        sold = int(r.get("sold_n") or 0)
+        out.append(
+            Alpha(
+                name=f"{w[:4]}…{w[-4:]}" if len(w) > 10 else w,
+                address=w,
+                copy=True,
+                conv=1.0,
+                why=f"{n} runners · {sold} sold",
+                wr=sold / n,
+            )
+        )
+    return out
+
+
+def live_watchlist(state: State) -> list[Alpha]:
+    """Copy list plus anyone we still have a paper bag on."""
+    picked = pick_early_copy(state)
+    have = {a.address for a in picked}
+    for pos in state.open_paper_positions():
+        path = pos.get("path") or ""
+        if not path.startswith("copy:"):
+            continue
+        addr = path.split(":", 1)[-1].strip()
+        if not addr or addr in have:
+            continue
+        have.add(addr)
+        picked.append(
+            Alpha(
+                name=f"{addr[:4]}…{addr[-4:]}" if len(addr) > 10 else addr,
+                address=addr,
+                copy=True,
+                conv=1.0,
+                why="open bag",
+                wr=0.0,
+            )
+        )
+    return picked
+
+
 async def poll_all(
     http: httpx.AsyncClient, state: State
 ) -> tuple[list[CopyHit], list[CopyExit]]:
@@ -269,9 +332,12 @@ async def poll_all(
     exits: list[CopyExit] = []
     seen_buy: set[str] = set()
     seen_sell: set[str] = set()
-    from .alpha import copy_alphas
+    watches = live_watchlist(state)
+    if not watches:
+        log.info("Copy poll 0 buys / 0 exits (no watchlist yet)")
+        return hits, exits
 
-    for alpha in copy_alphas():
+    for alpha in watches:
         try:
             moves = await scan_wallet(http, state, alpha)
         except Exception as exc:

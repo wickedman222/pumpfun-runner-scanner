@@ -7,7 +7,7 @@ import time
 from . import config, gather, health, paper
 from .alpha import all_alphas, copy_alphas
 from .attention import Attention
-from .copy import poll_all as copy_poll
+from .copy import live_watchlist, poll_all as copy_poll
 from .engine import evaluate_new
 from . import wallets as walletmod
 from .httputil import client
@@ -94,7 +94,32 @@ async def run() -> None:
         except Exception as exc:
             log.warning("Initial attention refresh failed: %s", exc)
 
-        if config.GATHER_MODE:
+        if config.GATHER_MODE and config.COPY_MODE:
+            watches = live_watchlist(state)
+            log.info(
+                "Live loop. gather + paper %s SOL book %s. copying %s early wallets.",
+                f"{(paper_snap or {}).get('equity') or config.PAPER_START_SOL:.3f}",
+                config.PAPER_BOOK_ID,
+                len(watches),
+            )
+            await send(http, format_early_boot(paper_snap, watches))
+            last_gather_report = time.time()
+
+            async def _gather_bg() -> None:
+                while True:
+                    try:
+                        added = await gather.cycle(http, state)
+                        board = state.early_board()
+                        health.STATUS["smart_wallets"] = board.get("wallets") or 0
+                        health.STATUS["posted"] = board.get("hits") or 0
+                        if added:
+                            log.info("Gather +%s · %s wallets", added, board.get("wallets"))
+                    except Exception as exc:
+                        log.warning("gather bg: %s", exc)
+                    await asyncio.sleep(config.GATHER_SEC)
+
+            asyncio.create_task(_gather_bg())
+        elif config.GATHER_MODE:
             log.info("Gather loop. early buyers on runners. paper off.")
             await send(http, format_early_boot())
         elif config.COPY_MODE:
@@ -113,7 +138,7 @@ async def run() -> None:
         while True:
             loop_start = time.time()
             try:
-                if config.GATHER_MODE:
+                if config.GATHER_MODE and not config.COPY_MODE:
                     if time.time() - last_wallet_harvest >= config.GATHER_SEC:
                         added = await gather.cycle(http, state)
                         last_wallet_harvest = time.time()
@@ -146,14 +171,18 @@ async def run() -> None:
                     health.STATUS["paper_equity"] = round(
                         paper.snapshot(state)["equity"], 4
                     ) if config.PAPER_ENABLED else 0
-                    health.STATUS["watches"] = len(copy_alphas())
+                    health.STATUS["watches"] = len(live_watchlist(state))
                     if time.time() - last_gather_report >= config.WALLET_REPORT_SEC:
                         snap = paper.snapshot(state) if config.PAPER_ENABLED else {
                             "equity": 0, "start": 2, "cash": 0, "open": [], "closed_n": 0, "pnl": 0, "unreal": 0, "size": 0
                         }
-                        ok = await send(http, format_copy_session(snap, all_alphas()))
+                        board = state.early_board()
+                        ok = await send(http, format_copy_session(snap, live_watchlist(state)))
                         if ok:
                             log.info("Copy session dump sent eq %.3f", snap["equity"])
+                        ok2 = await send(http, format_early_board(board))
+                        if ok2:
+                            log.info("Early list dump %s wallets", board.get("wallets"))
                         last_gather_report = time.time()
                     health.STATUS["last_error"] = ""
                     elapsed = time.time() - loop_start
@@ -318,7 +347,7 @@ async def _copy_fill(http, state: State, hit) -> None:
     )
     if not config.PAPER_ENABLED:
         return
-    fill = paper.try_open(state, coin, path=f"copy:{hit.alpha.name}", size_sol=hit.size_sol)
+    fill = paper.try_open(state, coin, path=f"copy:{hit.alpha.address}", size_sol=hit.size_sol)
     if not fill:
         return
     state.mark_posted(coin, hit.thesis)

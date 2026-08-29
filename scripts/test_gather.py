@@ -8,6 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from bot import config
+from bot.copy import pick_early_copy
 from bot.gather import is_winner, sold_from_hold
 from bot.state import State
 
@@ -52,6 +53,8 @@ def main() -> None:
     assert top[0]["wallet"] == "WalAAA111"
     assert top[0]["sold_n"] == 1
     assert top[0]["n"] == 2
+    picked = pick_early_copy(st)
+    assert picked and picked[0].address == "WalAAA111"
     print("gather rules ok")
 
 
