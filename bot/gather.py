@@ -16,7 +16,7 @@ import httpx
 from . import config
 from .attention import extract_farm_reason
 from .httputil import rpc
-from .pump import age_seconds, fetch_coin, graduated_coins, market_cap_coins
+from .pump import active_coins, age_seconds, fetch_coin, graduated_coins
 from .state import State
 from .wallets import SEED_RUNNERS, _is_lp, top_runners
 
@@ -251,19 +251,29 @@ async def mine_coin(http: httpx.AsyncClient, state: State, coin: dict) -> int:
 
 
 async def runner_pool(http: httpx.AsyncClient) -> list[dict]:
+    """Pump.fun website top-runners first. Skip market-cap farms (USMS/WOFI)."""
     now = time.time()
     pool: list[dict] = []
     seen: set[str] = set()
-    chunks = [
-        await top_runners(http),
-        await market_cap_coins(http, limit=40),
-        await graduated_coins(http, limit=30),
-    ]
+    site = await top_runners(http)
+    log.info(
+        "Site top-runners: %s",
+        ", ".join((c.get("symbol") or "?") for c in site) or "none",
+    )
+    for coin in site:
+        mint = coin.get("mint") or ""
+        if not mint or mint in seen:
+            continue
+        if extract_farm_reason(coin):
+            continue
+        seen.add(mint)
+        pool.append(coin)
+    extra = [await active_coins(http, limit=40), await graduated_coins(http, limit=25)]
     for mint in SEED_RUNNERS:
         c = await fetch_coin(http, mint)
         if c:
-            chunks.append([c])
-    for group in chunks:
+            extra.append([c])
+    for group in extra:
         for coin in group:
             mint = coin.get("mint") or ""
             if not mint or mint in seen:

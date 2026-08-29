@@ -177,6 +177,17 @@ def _short_wallet(w: str) -> str:
 
 
 def format_early_boot(snap: dict | None = None, watches: list | None = None) -> str:
+    if snap is None and not watches:
+        return "\n".join(
+            [
+                "<b>wallet gather</b>",
+                "paper off. mining launch buyers on pump.fun top-runners (the website list).",
+                "a later dump of that bag counts as PnL.",
+                "",
+                f"filters: site runners first · ATH ≥ ${_esc(f'{config.EARLY_MIN_ATH:,.0f}')} · first {config.EARLY_MAX_RANK} unique curve buyers · skip farms",
+                "<i>list dumps here as it fills. no paper until the list is real.</i>",
+            ]
+        )
     eq = float((snap or {}).get("equity") or config.PAPER_START_SOL)
     lines = [
         "<b>early-copy live</b>",
