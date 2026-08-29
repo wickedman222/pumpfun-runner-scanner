@@ -68,6 +68,7 @@ def main() -> None:
     assert abs(copy_size(5.0, 5.0, 1, 1.0, 5.0) - 0.30) < 1e-9
     assert abs(copy_size(5.0, 5.0, 3, 1.0, 5.0) - 0.30) < 1e-9
     assert copy_size(5.0, 0.20, 1, 1.0, 5.0) == 0.0
+    assert copy_size(5.0, 2.10, 1, 1.0, 5.0) == 0.0  # 40% cash floor
 
     now = time.time()
     assert entry_fail(coin(18_000), now, 20) == ""

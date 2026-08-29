@@ -220,6 +220,7 @@ from bot.telegram import format_gather
 assert abs(copy_size(5.0, 5.0, 1, 1.0, 5.0) - 0.30) < 1e-9
 assert abs(copy_size(5.0, 5.0, 3, 1.0, 5.0) - 0.30) < 1e-9
 assert copy_size(5.0, 0.20, 1, 1.0, 5.0) == 0.0
+assert copy_size(5.0, 2.10, 1, 1.0, 5.0) == 0.0
 assert entry_fail({"usd_market_cap": 5_000, "ath_market_cap": 5_000, "boost_mode": "NONE", "created_timestamp": int(now * 1000), "complete": False}, now, 10).startswith("thin")
 assert not entry_fail(
     {

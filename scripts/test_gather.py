@@ -55,6 +55,7 @@ def main() -> None:
     assert top[0]["n"] == 2
     picked = pick_early_copy(st)
     assert picked and picked[0].address == "WalAAA111"
+    assert all(a.address != "WalBBB222" for a in picked)
     print("gather rules ok")
 
 

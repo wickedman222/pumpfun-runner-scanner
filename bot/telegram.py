@@ -181,7 +181,7 @@ def format_early_boot(snap: dict | None = None, watches: list | None = None) -> 
     lines = [
         "<b>early-copy live</b>",
         "gather keeps mining launch buyers. paper copies the current top list (new buys only).",
-        f"equity <b>{eq:.3f} SOL</b> · {config.PAPER_SIZE_FIXED:.1f} SOL/trade · flatten when they sell",
+        f"equity <b>{eq:.3f} SOL</b> · {config.PAPER_SIZE_FIXED:.1f} SOL/trade · need {config.COPY_MIN_ALPHAS} wallets · max {config.PAPER_MAX_OPEN} open",
         "",
         "<b>copying now</b>",
     ]

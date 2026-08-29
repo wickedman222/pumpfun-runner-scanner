@@ -153,17 +153,19 @@ WALLET_BOOK_ID = _env("WALLET_BOOK_ID", "early-1")
 PAPER_ENABLED = _int("PAPER_ENABLED", 1) == 1
 PAPER_START_SOL = _float("PAPER_START_SOL", 5.0)
 # Bump this string to flatten the paper book and start from PAPER_START_SOL again.
-PAPER_BOOK_ID = _env("PAPER_BOOK_ID", "early-copy-1")
+PAPER_BOOK_ID = _env("PAPER_BOOK_ID", "early-copy-2")
 PAPER_SIZE_FIXED = _float("PAPER_SIZE_FIXED", 0.30)
 PAPER_SIZE_FRAC = _float("PAPER_SIZE_FRAC", 0.0)  # unused — size is PAPER_SIZE_FIXED
 PAPER_SIZE_MIN = _float("PAPER_SIZE_MIN", 0.30)
 PAPER_SIZE_MAX = _float("PAPER_SIZE_MAX", 0.30)
-PAPER_MAX_OPEN = _int("PAPER_MAX_OPEN", 24)
+PAPER_MAX_OPEN = _int("PAPER_MAX_OPEN", 4)
 COPY_MODE = _int("COPY_MODE", 1) == 1
-COPY_WATCH_N = _int("COPY_WATCH_N", 12)
-COPY_MAX_LAG_SEC = _int("COPY_MAX_LAG_SEC", 120)
+COPY_WATCH_N = _int("COPY_WATCH_N", 8)
+COPY_MIN_ALPHAS = _int("COPY_MIN_ALPHAS", 2)
+COPY_MAX_LAG_SEC = _int("COPY_MAX_LAG_SEC", 90)
 COPY_MIN_MC = _float("COPY_MIN_MC", 8_000)
-COPY_MAX_MC = _float("COPY_MAX_MC", 50_000)
+COPY_MAX_MC = _float("COPY_MAX_MC", 22_000)
+COPY_CASH_FLOOR = _float("COPY_CASH_FLOOR", 0.40)
 COPY_MAX_AGE_SEC = _int("COPY_MAX_AGE_SEC", 4 * 3600)
 COPY_POLL_SEC = _int("COPY_POLL_SEC", 8)
 PAPER_MIN_EQUITY = _float("PAPER_MIN_EQUITY", 0.25)
@@ -182,8 +184,8 @@ PAPER_TP3_MULT = _float("PAPER_TP3_MULT", 10.0)
 PAPER_TP3_SELL = _float("PAPER_TP3_SELL", 0.20)  # clip part of the moonbag
 PAPER_TRAIL_GIVEBACK = _float("PAPER_TRAIL_GIVEBACK", 0.0)  # 0 = no trail
 # Missed dump backstop: still full size and <0.22x after 40m → flatten.
-PAPER_STALE_SEC = _int("PAPER_STALE_SEC", 40 * 60)
-PAPER_STALE_MULT = _float("PAPER_STALE_MULT", 0.22)
+PAPER_STALE_SEC = _int("PAPER_STALE_SEC", 20 * 60)
+PAPER_STALE_MULT = _float("PAPER_STALE_MULT", 0.40)
 PAPER_REPORT_SEC = _int("PAPER_REPORT_SEC", 2 * 3600)
 
 # Known AMM / pool authorities — not "holders"

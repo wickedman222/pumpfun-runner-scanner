@@ -103,6 +103,8 @@ def copy_size(equity: float, cash: float, n_alphas: int, conv: float, peak: floa
     size = round(config.PAPER_SIZE_FIXED, 3)
     if cash < size:
         return 0.0
+    if cash - size < equity * config.COPY_CASH_FLOOR:
+        return 0.0
     return size
 
 
@@ -201,9 +203,20 @@ async def consider_buy(
         return None
     state.note_copy_hit(alpha.address, mint)
     n = max(1, state.copy_hit_count(mint, window_sec=20 * 60))
+    if n < config.COPY_MIN_ALPHAS:
+        log.info("Skip copy %s %s: only %s alpha", alpha.name, coin.get("symbol"), n)
+        return None
     from . import paper as paper_mod
 
     snap = paper_mod.snapshot(state)
+    leader_bags = [
+        p
+        for p in snap["open"]
+        if (p.get("path") or "") == f"copy:{alpha.address}"
+    ]
+    if leader_bags:
+        log.info("Skip copy %s %s — already riding %s", alpha.name, coin.get("symbol"), leader_bags[0].get("symbol"))
+        return None
     peak = float(state.get_meta("equity_peak") or snap["equity"] or 0)
     if snap["equity"] > peak:
         state.set_meta("equity_peak", str(snap["equity"]))
@@ -264,21 +277,12 @@ async def consider_exit(
 def pick_early_copy(state: State) -> list[Alpha]:
     """Top gathered wallets: sold the rip, preferably on more than one runner."""
     rows = (state.early_board(limit=60).get("top") or [])
+    # Never pad with 1-hit spray wallets — that is how early-copy-1 bled.
     strong = [
         r
         for r in rows
         if int(r.get("n") or 0) >= 2 and int(r.get("sold_n") or 0) >= 1
     ]
-    used = {r.get("wallet") for r in strong}
-    if len(strong) < config.COPY_WATCH_N:
-        strong.extend(
-            r
-            for r in rows
-            if r.get("wallet") not in used and int(r.get("sold_n") or 0) >= 1
-        )
-        used = {r.get("wallet") for r in strong}
-    if len(strong) < config.COPY_WATCH_N:
-        strong.extend(r for r in rows if r.get("wallet") not in used)
     out: list[Alpha] = []
     for r in strong[: config.COPY_WATCH_N]:
         w = str(r.get("wallet") or "")
