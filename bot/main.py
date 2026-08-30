@@ -4,7 +4,7 @@ import asyncio
 import logging
 import sys
 import time
-from . import config, dex, gather, health, paper
+from . import config, dex, gather, health, paper, strict
 from .alpha import all_alphas, copy_alphas
 from .attention import Attention, extract_farm_reason
 from .copy import live_watchlist, poll_all as copy_poll
@@ -23,6 +23,7 @@ from .telegram import (
     format_copy_boot,
     format_copy_exit,
     format_dex_boot,
+    format_strict_boot,
     format_copy_hit,
     format_copy_session,
     format_early_board,
@@ -111,6 +112,15 @@ async def run() -> None:
         if config.GATHER_MODE and (config.COPY_MODE or config.DEX_MODE):
             asyncio.create_task(_gather_bg())
 
+        armed_launches: dict = {}
+        if config.STRICT_MODE:
+            log.info(
+                "Strict launch filter. paper %s SOL book %s.",
+                f"{(paper_snap or {}).get('equity') or config.PAPER_START_SOL:.3f}",
+                config.PAPER_BOOK_ID,
+            )
+            await send(http, format_strict_boot(paper_snap))
+            last_gather_report = time.time()
         if config.DEX_MODE:
             log.info(
                 "Dex loop. paper %s SOL book %s. Dexscreener PumpSwap.",
@@ -143,12 +153,47 @@ async def run() -> None:
             )
             if paper_snap:
                 await send(http, format_copy_boot(paper_snap, all_alphas()))
-        else:
+        elif not config.DEX_MODE:
             log.info("Scanner loop started (tape mode)")
 
         while True:
             loop_start = time.time()
             try:
+                if config.STRICT_MODE:
+                    passed = await strict.scan_latest(http, state, armed_launches)
+                    for coin in passed:
+                        if not config.PAPER_ENABLED:
+                            break
+                        fill = paper.try_open(state, coin, path="strict")
+                        if not fill:
+                            continue
+                        state.mark_posted(coin, "strict pass")
+                        snap = paper.snapshot(state)
+                        health.STATUS["paper_equity"] = round(snap["equity"], 4)
+                        log.info(
+                            "STRICT BUY %s %.3f SOL @ $%.0f vol $%.0f",
+                            coin.get("symbol"),
+                            abs(fill.sol),
+                            fill.mc,
+                            float(coin.get("strict_vol") or 0),
+                        )
+                        await send(http, format_paper_fill(fill, snap))
+                    if config.PAPER_ENABLED:
+                        await _manage_paper(http, state)
+                        health.STATUS["paper_equity"] = round(
+                            paper.snapshot(state)["equity"], 4
+                        )
+                    health.STATUS["watches"] = len(armed_launches)
+                    if time.time() - last_gather_report >= config.WALLET_REPORT_SEC:
+                        snap = paper.snapshot(state) if config.PAPER_ENABLED else {
+                            "equity": 0, "start": 2, "cash": 0, "open": [], "closed_n": 0, "pnl": 0, "unreal": 0, "size": 0
+                        }
+                        await send(http, format_paper_book(snap))
+                        last_gather_report = time.time()
+                    health.STATUS["last_error"] = ""
+                    elapsed = time.time() - loop_start
+                    await asyncio.sleep(max(0.5, config.STRICT_POLL_SEC - elapsed))
+                    continue
                 if config.DEX_MODE:
                     coins = await dex.candidates(http)
                     for coin in coins:

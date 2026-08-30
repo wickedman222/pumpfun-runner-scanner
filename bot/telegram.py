@@ -176,6 +176,24 @@ def _short_wallet(w: str) -> str:
     return w
 
 
+def format_strict_boot(snap: dict | None = None) -> str:
+    eq = float((snap or {}).get("equity") or config.PAPER_START_SOL)
+    return "\n".join(
+        [
+            "<b>strict launch filter</b>",
+            "no prediction. paper buy only if a new pump.fun coin passes all four gates.",
+            f"equity <b>{eq:.3f} SOL</b> · {config.PAPER_SIZE_FIXED:.1f} SOL/trade · max {config.PAPER_MAX_OPEN} open",
+            "",
+            f"1. opening bundle ≤ {config.STRICT_BUNDLE_PCT:.0f}% across clustered wallets",
+            f"2. top 5 holders ≤ {config.STRICT_TOP5_PCT:.0f}% (ex curve)",
+            "3. twitter or telegram in metadata",
+            f"4. ≥ ${config.STRICT_MIN_VOL_USD:,.0f} organic vol in {config.STRICT_VOL_SEC}s",
+            f"exit: −{int((1 - config.STRICT_STOP_MULT) * 100)}% stop · trail after {config.STRICT_TRAIL_ARM:.1f}x · {config.STRICT_TIME_SEC // 60}m time kill",
+            "<i>never signs a real tx. Helius RPC if HELIUS_API_KEY is set.</i>",
+        ]
+    )
+
+
 def format_dex_boot(snap: dict | None = None) -> str:
     eq = float((snap or {}).get("equity") or config.PAPER_START_SOL)
     return "\n".join(
@@ -275,9 +293,18 @@ def format_paper_fill(fill, snap: dict) -> str:
             f"path {_esc(pos.get('path') or '—')}",
             "",
             "<b>PLAN</b>",
-            "flatten when the alpha sells",
-            f"clip {int(config.PAPER_TP1_SELL * 100)}% at {config.PAPER_TP1_MULT:.1f}x / {int(config.PAPER_TP2_SELL * 100)}% at {config.PAPER_TP2_MULT:.1f}x if it rips first",
         ]
+        if (pos.get("path") or "") == "strict":
+            lines += [
+                f"stop −{int((1 - config.STRICT_STOP_MULT) * 100)}%",
+                f"trail −{int(config.STRICT_TRAIL_GIVE * 100)}% off ATH after {config.STRICT_TRAIL_ARM:.1f}x",
+                f"time kill {config.STRICT_TIME_SEC // 60}m if < {config.STRICT_TIME_MULT:.1f}x",
+            ]
+        else:
+            lines += [
+                "flatten when the alpha sells",
+                f"clip {int(config.PAPER_TP1_SELL * 100)}% at {config.PAPER_TP1_MULT:.1f}x / {int(config.PAPER_TP2_SELL * 100)}% at {config.PAPER_TP2_MULT:.1f}x if it rips first",
+            ]
     else:
         left = float(pos.get("remaining_frac") or 0)
         status = pos.get("status") or "open"

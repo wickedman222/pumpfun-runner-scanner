@@ -111,11 +111,17 @@ def try_open(state: State, coin: dict, path: str = "", size_sol: float | None = 
     }
     state.upsert_paper_position(pos)
     state.set_paper_cash(cash)
+    reason = f"signal {path or 'call'}"
+    if path == "strict":
+        reason = (
+            f"strict pass · slip {config.PAPER_ENTRY_SLIP * 100:.0f}% · "
+            f"prio ~{config.STRICT_PRIO_SOL:.4f} SOL · ts {now}"
+        )
     fill = {
         "mint": mint,
         "ts": now,
         "side": "buy",
-        "reason": f"signal {path or 'call'}",
+        "reason": reason,
         "frac": 1.0,
         "multiple": 1.0,
         "sol": -size,
@@ -213,8 +219,38 @@ def flatten(state: State, pos: dict, coin: dict, reason: str) -> Fill | None:
     return _sell(state, pos, left, reason, mc)
 
 
+def _strict_exit(pos: dict, coin: dict) -> list[tuple[float, str]]:
+    """Hard rules only: stop, trail off ATH, time kill. No prediction."""
+    mc = float(coin.get("usd_market_cap") or 0)
+    multiple = _mult(pos, mc)
+    left = float(pos.get("remaining_frac") or 0)
+    if left <= 0 or mc <= 0:
+        return []
+    opened = int(pos.get("opened_at") or 0)
+    held = time.time() - opened if opened else 0
+    ath = max(float(pos.get("ath_mc") or 0), mc)
+    entry = float(pos.get("entry_mc") or 0)
+    if multiple <= config.STRICT_STOP_MULT:
+        return [(left, f"stop {multiple:.2f}x")]
+    if (
+        config.STRICT_TIME_SEC > 0
+        and held >= config.STRICT_TIME_SEC
+        and multiple < config.STRICT_TIME_MULT
+    ):
+        return [(left, f"time {held:.0f}s {multiple:.2f}x")]
+    if (
+        entry
+        and ath >= entry * config.STRICT_TRAIL_ARM
+        and mc <= ath * (1.0 - config.STRICT_TRAIL_GIVE)
+    ):
+        return [(left, f"trail {multiple:.2f}x vs ATH {ath / entry:.2f}x")]
+    return []
+
+
 def decide(pos: dict, coin: dict) -> list[tuple[float, str]]:
     """Clip 2x/4x/10x while they hold. Flatten stale bags we missed the dump on."""
+    if (pos.get("path") or "") == "strict":
+        return _strict_exit(pos, coin)
     mc = float(coin.get("usd_market_cap") or 0)
     if mc <= 0:
         return []
