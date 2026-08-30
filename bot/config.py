@@ -147,19 +147,26 @@ RUNNER_MAX_DD = _float("RUNNER_MAX_DD", 0.55)
 RUNNER_MIN_DD = _float("RUNNER_MIN_DD", 0.08)
 WALLET_MAX_BUY_MC = _float("WALLET_MAX_BUY_MC", 80_000)
 WALLET_MAX_AGE_SEC = _int("WALLET_MAX_AGE_SEC", 90 * 60)
-WALLET_BOOK_ID = _env("WALLET_BOOK_ID", "runners-web-1")
+WALLET_BOOK_ID = _env("WALLET_BOOK_ID", "dex-1")
 
 # --- Paper book (no real SOL) ---
-PAPER_ENABLED = _int("PAPER_ENABLED", 0) == 1
+PAPER_ENABLED = _int("PAPER_ENABLED", 1) == 1
 PAPER_START_SOL = _float("PAPER_START_SOL", 5.0)
 # Bump this string to flatten the paper book and start from PAPER_START_SOL again.
-PAPER_BOOK_ID = _env("PAPER_BOOK_ID", "early-copy-2")
+PAPER_BOOK_ID = _env("PAPER_BOOK_ID", "dex-1")
 PAPER_SIZE_FIXED = _float("PAPER_SIZE_FIXED", 0.30)
 PAPER_SIZE_FRAC = _float("PAPER_SIZE_FRAC", 0.0)  # unused — size is PAPER_SIZE_FIXED
 PAPER_SIZE_MIN = _float("PAPER_SIZE_MIN", 0.30)
 PAPER_SIZE_MAX = _float("PAPER_SIZE_MAX", 0.30)
 PAPER_MAX_OPEN = _int("PAPER_MAX_OPEN", 4)
 COPY_MODE = _int("COPY_MODE", 0) == 1
+DEX_MODE = _int("DEX_MODE", 1) == 1
+DEX_POLL_SEC = _int("DEX_POLL_SEC", 12)
+DEX_MIN_MC = _float("DEX_MIN_MC", 25_000)
+DEX_MAX_MC = _float("DEX_MAX_MC", 180_000)
+DEX_MAX_AGE_H = _float("DEX_MAX_AGE_H", 10.0)
+DEX_MIN_CHG_H1 = _float("DEX_MIN_CHG_H1", 12.0)
+DEX_MIN_VOL_H1 = _float("DEX_MIN_VOL_H1", 20_000)
 COPY_WATCH_N = _int("COPY_WATCH_N", 8)
 COPY_MIN_ALPHAS = _int("COPY_MIN_ALPHAS", 2)
 COPY_MAX_LAG_SEC = _int("COPY_MAX_LAG_SEC", 90)

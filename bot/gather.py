@@ -16,9 +16,9 @@ import httpx
 from . import config
 from .attention import extract_farm_reason
 from .httputil import rpc
-from .pump import active_coins, age_seconds, fetch_coin, graduated_coins
+from .pump import age_seconds, fetch_coin
 from .state import State
-from .wallets import SEED_RUNNERS, _is_lp, top_runners
+from .wallets import _is_lp
 
 log = logging.getLogger("runner")
 
@@ -251,41 +251,30 @@ async def mine_coin(http: httpx.AsyncClient, state: State, coin: dict) -> int:
 
 
 async def runner_pool(http: httpx.AsyncClient) -> list[dict]:
-    """Pump.fun website top-runners first. Skip market-cap farms (USMS/WOFI)."""
-    now = time.time()
+    """Recent Dexscreener PumpSwap runners + the missed examples. No SEED/old megas."""
+    from . import dex as dexmod
+
     pool: list[dict] = []
     seen: set[str] = set()
-    site = await top_runners(http)
+    live = await dexmod.runner_mints(http)
     log.info(
-        "Site top-runners: %s",
-        ", ".join((c.get("symbol") or "?") for c in site) or "none",
+        "Dex runners: %s",
+        ", ".join((c.get("symbol") or "?") for c in live) or "none",
     )
-    for coin in site:
+    for coin in live:
         mint = coin.get("mint") or ""
         if not mint or mint in seen:
             continue
-        if extract_farm_reason(coin):
+        seen.add(mint)
+        pumped = await fetch_coin(http, mint)
+        pool.append(pumped or coin)
+    for mint in dexmod.EXAMPLE_RUNNERS:
+        if mint in seen:
             continue
         seen.add(mint)
-        pool.append(coin)
-    extra = [await active_coins(http, limit=40), await graduated_coins(http, limit=25)]
-    for mint in SEED_RUNNERS:
         c = await fetch_coin(http, mint)
         if c:
-            extra.append([c])
-    for group in extra:
-        for coin in group:
-            mint = coin.get("mint") or ""
-            if not mint or mint in seen:
-                continue
-            if is_winner(coin, now):
-                continue
-            seen.add(mint)
-            pool.append(coin)
-    pool.sort(
-        key=lambda c: float(c.get("ath_market_cap") or c.get("usd_market_cap") or 0),
-        reverse=True,
-    )
+            pool.append(c)
     return pool[:16]
 
 

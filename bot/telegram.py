@@ -176,6 +176,19 @@ def _short_wallet(w: str) -> str:
     return w
 
 
+def format_dex_boot(snap: dict | None = None) -> str:
+    eq = float((snap or {}).get("equity") or config.PAPER_START_SOL)
+    return "\n".join(
+        [
+            "<b>dex paper</b>",
+            "feed is Dexscreener PumpSwap (fone/Greyson/STACY class), not old chat coins.",
+            f"equity <b>{eq:.3f} SOL</b> · {config.PAPER_SIZE_FIXED:.1f} SOL/trade · max {config.PAPER_MAX_OPEN} open",
+            f"buy ${config.DEX_MIN_MC:,.0f}–${config.DEX_MAX_MC:,.0f} · age ≤ {config.DEX_MAX_AGE_H:.0f}h · +{config.DEX_MIN_CHG_H1:.0f}% 1h",
+            "<i>gather still mines launch wallets on those runners. no historical copy.</i>",
+        ]
+    )
+
+
 def format_early_boot(snap: dict | None = None, watches: list | None = None) -> str:
     if snap is None and not watches:
         return "\n".join(

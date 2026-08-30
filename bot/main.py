@@ -4,9 +4,9 @@ import asyncio
 import logging
 import sys
 import time
-from . import config, gather, health, paper
+from . import config, dex, gather, health, paper
 from .alpha import all_alphas, copy_alphas
-from .attention import Attention
+from .attention import Attention, extract_farm_reason
 from .copy import live_watchlist, poll_all as copy_poll
 from .engine import evaluate_new
 from . import wallets as walletmod
@@ -22,6 +22,7 @@ from .state import State
 from .telegram import (
     format_copy_boot,
     format_copy_exit,
+    format_dex_boot,
     format_copy_hit,
     format_copy_session,
     format_early_board,
@@ -94,7 +95,32 @@ async def run() -> None:
         except Exception as exc:
             log.warning("Initial attention refresh failed: %s", exc)
 
-        if config.GATHER_MODE and config.COPY_MODE:
+        async def _gather_bg() -> None:
+            while True:
+                try:
+                    added = await gather.cycle(http, state)
+                    board = state.early_board()
+                    health.STATUS["smart_wallets"] = board.get("wallets") or 0
+                    health.STATUS["posted"] = board.get("hits") or 0
+                    if added:
+                        log.info("Gather +%s · %s wallets", added, board.get("wallets"))
+                except Exception as exc:
+                    log.warning("gather bg: %s", exc)
+                await asyncio.sleep(config.GATHER_SEC)
+
+        if config.GATHER_MODE and (config.COPY_MODE or config.DEX_MODE):
+            asyncio.create_task(_gather_bg())
+
+        if config.DEX_MODE:
+            log.info(
+                "Dex loop. paper %s SOL book %s. Dexscreener PumpSwap.",
+                f"{(paper_snap or {}).get('equity') or config.PAPER_START_SOL:.3f}",
+                config.PAPER_BOOK_ID,
+            )
+            await send(http, format_dex_boot(paper_snap))
+            last_gather_report = time.time()
+
+        if config.GATHER_MODE and config.COPY_MODE and not config.DEX_MODE:
             watches = live_watchlist(state)
             log.info(
                 "Live loop. gather + paper %s SOL book %s. copying %s early wallets.",
@@ -104,22 +130,7 @@ async def run() -> None:
             )
             await send(http, format_early_boot(paper_snap, watches))
             last_gather_report = time.time()
-
-            async def _gather_bg() -> None:
-                while True:
-                    try:
-                        added = await gather.cycle(http, state)
-                        board = state.early_board()
-                        health.STATUS["smart_wallets"] = board.get("wallets") or 0
-                        health.STATUS["posted"] = board.get("hits") or 0
-                        if added:
-                            log.info("Gather +%s · %s wallets", added, board.get("wallets"))
-                    except Exception as exc:
-                        log.warning("gather bg: %s", exc)
-                    await asyncio.sleep(config.GATHER_SEC)
-
-            asyncio.create_task(_gather_bg())
-        elif config.GATHER_MODE:
+        elif config.GATHER_MODE and not config.DEX_MODE:
             log.info("Gather loop. early buyers on runners. paper off.")
             await send(http, format_early_boot())
         elif config.COPY_MODE:
@@ -138,6 +149,44 @@ async def run() -> None:
         while True:
             loop_start = time.time()
             try:
+                if config.DEX_MODE:
+                    coins = await dex.candidates(http)
+                    for coin in coins:
+                        mint = coin.get("mint") or ""
+                        if not mint or state.already_posted(mint) or state.paper_position(mint):
+                            continue
+                        pumped = await fetch_coin(http, mint)
+                        farm = extract_farm_reason(pumped) if pumped else ""
+                        if farm:
+                            log.info("Skip dex %s: %s", coin.get("symbol"), farm)
+                            continue
+                        if not config.PAPER_ENABLED:
+                            continue
+                        fill = paper.try_open(state, coin, path="dex")
+                        if not fill:
+                            continue
+                        state.mark_posted(coin, "dex pumpswap")
+                        snap = paper.snapshot(state)
+                        health.STATUS["paper_equity"] = round(snap["equity"], 4)
+                        log.info("DEX BUY %s %.3f SOL @ $%.0f", coin.get("symbol"), fill.sol, fill.mc)
+                        await send(http, format_paper_fill(fill, snap))
+                    if config.PAPER_ENABLED:
+                        await _manage_paper(http, state)
+                        health.STATUS["paper_equity"] = round(
+                            paper.snapshot(state)["equity"], 4
+                        )
+                    health.STATUS["watches"] = len(coins)
+                    if time.time() - last_gather_report >= config.WALLET_REPORT_SEC:
+                        snap = paper.snapshot(state) if config.PAPER_ENABLED else {
+                            "equity": 0, "start": 2, "cash": 0, "open": [], "closed_n": 0, "pnl": 0, "unreal": 0, "size": 0
+                        }
+                        await send(http, format_paper_book(snap))
+                        await send(http, format_early_board(state.early_board()))
+                        last_gather_report = time.time()
+                    health.STATUS["last_error"] = ""
+                    elapsed = time.time() - loop_start
+                    await asyncio.sleep(max(1.0, config.DEX_POLL_SEC - elapsed))
+                    continue
                 if config.GATHER_MODE and not config.COPY_MODE:
                     if time.time() - last_wallet_harvest >= config.GATHER_SEC:
                         added = await gather.cycle(http, state)
