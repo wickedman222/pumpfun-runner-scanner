@@ -4,7 +4,7 @@ import asyncio
 import logging
 import sys
 import time
-from . import config, dex, gather, health, paper, strict
+from . import config, dex, gather, health, kamino, paper, strict
 from .alpha import all_alphas, copy_alphas
 from .attention import Attention, extract_farm_reason
 from .copy import live_watchlist, poll_all as copy_poll
@@ -23,6 +23,8 @@ from .telegram import (
     format_copy_boot,
     format_copy_exit,
     format_dex_boot,
+    format_kamino_boot,
+    format_kamino_liq,
     format_strict_boot,
     format_copy_hit,
     format_copy_session,
@@ -113,6 +115,15 @@ async def run() -> None:
             asyncio.create_task(_gather_bg())
 
         armed_launches: dict = {}
+        keeper = kamino.Keeper()
+        if config.KAMINO_MODE:
+            log.info(
+                "Kamino paper keeper. paper %s SOL book %s.",
+                f"{(paper_snap or {}).get('equity') or config.PAPER_START_SOL:.3f}",
+                config.PAPER_BOOK_ID,
+            )
+            await send(http, format_kamino_boot(paper_snap))
+            last_gather_report = time.time()
         if config.STRICT_MODE:
             log.info(
                 "Strict launch filter. paper %s SOL book %s.",
@@ -153,12 +164,76 @@ async def run() -> None:
             )
             if paper_snap:
                 await send(http, format_copy_boot(paper_snap, all_alphas()))
-        elif not config.DEX_MODE:
+        elif not config.DEX_MODE and not config.KAMINO_MODE:
             log.info("Scanner loop started (tape mode)")
 
         while True:
             loop_start = time.time()
             try:
+                if config.KAMINO_MODE:
+                    stats = await keeper.cycle(state)
+                    health.STATUS["feeds"] = {
+                        "market": stats.market,
+                        "scanned": stats.scanned,
+                        "stale_liq": stats.stale_liq,
+                        "verified": stats.verified,
+                        "armed": stats.armed,
+                        "ready": stats.ready,
+                        "gpa": stats.gpa_ok,
+                    }
+                    health.STATUS["watches"] = stats.armed
+                    if stats.gpa_err:
+                        health.STATUS["last_error"] = stats.gpa_err[:180]
+                    if stats.gpa_ok is False:
+                        log.info("Kamino GPA blocked (%s). waiting on Helius/RPC.", stats.gpa_err[:80])
+                    else:
+                        log.info(
+                            "kamino %s scanned=%s stale=%s verified=%s armed=%s ready=%s",
+                            stats.market,
+                            stats.scanned,
+                            stats.stale_liq,
+                            stats.verified,
+                            stats.armed,
+                            stats.ready,
+                        )
+                    for coin in stats.fills:
+                        if not config.PAPER_ENABLED:
+                            break
+                        reason = (
+                            f"kamino {coin.get('market')} · {coin.get('symbol')} · "
+                            f"bonus {int(coin.get('bonus_bps') or 0)}bps · "
+                            f"confirmed {config.KAMINO_CONFIRM_SEC}s · "
+                            f"prio {config.KAMINO_PRIO_SOL:.4f} SOL"
+                        )
+                        fill = paper.roundtrip(
+                            state,
+                            coin,
+                            float(coin.get("spent_sol") or 0),
+                            float(coin.get("proceeds_sol") or 0),
+                            reason,
+                            path="kamino",
+                        )
+                        if not fill:
+                            continue
+                        state.mark_posted(coin, reason)
+                        snap = paper.snapshot(state)
+                        health.STATUS["paper_equity"] = round(snap["equity"], 4)
+                        await send(http, format_kamino_liq(fill, snap, coin))
+                    if config.PAPER_ENABLED:
+                        health.STATUS["paper_equity"] = round(
+                            paper.snapshot(state)["equity"], 4
+                        )
+                    if time.time() - last_gather_report >= config.WALLET_REPORT_SEC:
+                        snap = paper.snapshot(state) if config.PAPER_ENABLED else {
+                            "equity": 0, "start": 2, "cash": 0, "open": [], "closed_n": 0, "pnl": 0, "unreal": 0, "size": 0
+                        }
+                        await send(http, format_paper_book(snap))
+                        last_gather_report = time.time()
+                    if not stats.gpa_err:
+                        health.STATUS["last_error"] = ""
+                    elapsed = time.time() - loop_start
+                    await asyncio.sleep(max(1.0, config.KAMINO_POLL_SEC - elapsed))
+                    continue
                 if config.STRICT_MODE:
                     passed = await strict.scan_latest(http, state, armed_launches)
                     for coin in passed:

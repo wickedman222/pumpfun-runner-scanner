@@ -32,7 +32,7 @@ def _rpc_client() -> httpx.AsyncClient:
     global _RPC_HTTP
     if _RPC_HTTP is None or _RPC_HTTP.is_closed:
         _RPC_HTTP = httpx.AsyncClient(
-            timeout=20.0,
+            timeout=90.0,
             headers={
                 "Accept": "application/json",
                 "Content-Type": "application/json",
@@ -41,14 +41,14 @@ def _rpc_client() -> httpx.AsyncClient:
     return _RPC_HTTP
 
 
-async def rpc(method: str, params: list) -> dict | None:
+async def rpc(method: str, params: list, timeout: float = 20.0) -> dict | None:
     last_status = 0
     for attempt in range(4):
         try:
             r = await _rpc_client().post(
                 config.SOLANA_RPC_URL,
                 json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
-                timeout=20.0,
+                timeout=timeout,
             )
             last_status = r.status_code
             if r.status_code == 429:

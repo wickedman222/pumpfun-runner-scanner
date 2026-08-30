@@ -176,6 +176,50 @@ def _short_wallet(w: str) -> str:
     return w
 
 
+def format_kamino_boot(snap: dict | None = None) -> str:
+    eq = float((snap or {}).get("equity") or config.PAPER_START_SOL)
+    return "\n".join(
+        [
+            "<b>kamino paper keeper</b>",
+            "no prediction. paper-liquidate leftover unhealthy loans after keepers miss.",
+            f"equity <b>{eq:.3f} SOL</b> · {config.PAPER_SIZE_FIXED:.1f} SOL/trade · cash floor {config.KAMINO_CASH_FLOOR:.2f}",
+            "",
+            "skip Main SOL/BTC (100k loans, 0.1% race).",
+            f"arm when LTV ≥ liq LTV · fill if still open after {config.KAMINO_CONFIRM_SEC}s",
+            f"need bonus ≥ {config.KAMINO_MIN_BONUS_BPS} bps or a thin/curated market",
+            f"exit is atomic (repay → seize → dump). prio ~{config.KAMINO_PRIO_SOL:.4f} SOL + slip already in PnL.",
+            "<i>never signs a real tx. GPA needs Helius if public RPC refuses it.</i>",
+        ]
+    )
+
+
+def format_kamino_liq(fill, snap: dict, coin: dict | None = None) -> str:
+    pos = fill.pos
+    url = pos.get("url") or ""
+    name = f"${_esc(fill.symbol)}"
+    if url:
+        name = f"<a href=\"{_esc(url)}\">{_esc(fill.symbol)}</a>"
+    pnl = snap["equity"] - snap["start"]
+    extra = coin or {}
+    spent = float(extra.get("spent_sol") or 0)
+    debt = float(extra.get("debt_usd") or 0)
+    bps = int(extra.get("bonus_bps") or 0)
+    lines = [
+        "<b>PAPER LIQ</b>  (not real SOL)",
+        "",
+        f"{name}  {_esc(pos.get('name') or '')}",
+        f"{_esc(fill.reason)}",
+        f"spent <b>{spent:.3f} SOL</b> · pnl <b>{_esc(_fmt_sol(fill.sol))}</b> · {fill.multiple:.3f}x",
+        f"bonus {bps} bps · debt {_esc(_fmt_usd(debt))} · "
+        f"LTV {float(extra.get('current_ltv') or 0):.3f}/{float(extra.get('liq_ltv') or 0):.3f}",
+        "",
+        f"wallet  cash {snap['cash']:.3f}  equity <b>{snap['equity']:.3f} SOL</b>",
+        f"vs start {snap['start']:.2f}  {_esc(_fmt_sol(pnl))}",
+        f"{snap['closed_n']} closed · next size {snap['size']:.3f} SOL",
+    ]
+    return "\n".join(lines)
+
+
 def format_strict_boot(snap: dict | None = None) -> str:
     eq = float((snap or {}).get("equity") or config.PAPER_START_SOL)
     return "\n".join(
@@ -299,6 +343,11 @@ def format_paper_fill(fill, snap: dict) -> str:
                 f"stop −{int((1 - config.STRICT_STOP_MULT) * 100)}%",
                 f"trail −{int(config.STRICT_TRAIL_GIVE * 100)}% off ATH after {config.STRICT_TRAIL_ARM:.1f}x",
                 f"time kill {config.STRICT_TIME_SEC // 60}m if < {config.STRICT_TIME_MULT:.1f}x",
+            ]
+        elif (pos.get("path") or "") == "kamino":
+            lines += [
+                "atomic: repay debt, seize collateral, dump",
+                "no hold — fill is the whole trade",
             ]
         else:
             lines += [

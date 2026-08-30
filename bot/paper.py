@@ -68,7 +68,8 @@ def snapshot(state: State) -> dict:
 
 def try_open(state: State, coin: dict, path: str = "", size_sol: float | None = None) -> Fill | None:
     mint = coin.get("mint") or ""
-    if not mint or state.paper_position(mint):
+    existing = state.paper_position(mint) if mint else None
+    if not mint or (existing and (existing.get("status") or "") in ("open", "moonbag")):
         return None
     snap = snapshot(state)
     opens = snap["open"]
@@ -247,10 +248,118 @@ def _strict_exit(pos: dict, coin: dict) -> list[tuple[float, str]]:
     return []
 
 
+def roundtrip(
+    state: State,
+    coin: dict,
+    spent_sol: float,
+    proceeds_sol: float,
+    reason: str,
+    path: str = "kamino",
+) -> Fill | None:
+    """Atomic paper liq. spent/proceeds already include slip, fee, and prio."""
+    mint = coin.get("mint") or ""
+    if not mint or spent_sol <= 0:
+        return None
+    existing = state.paper_position(mint)
+    if existing and (existing.get("status") or "") in ("open", "moonbag"):
+        return None
+    snap = snapshot(state)
+    floor = config.KAMINO_CASH_FLOOR if path == "kamino" else 0.0
+    if snap["cash"] < spent_sol or snap["cash"] - spent_sol + min(proceeds_sol, 0) < floor:
+        log.info(
+            "Paper skip %s — cash %.3f spent %.3f floor %.3f",
+            coin.get("symbol"),
+            snap["cash"],
+            spent_sol,
+            floor,
+        )
+        return None
+    now = int(time.time())
+    cash_after_buy = snap["cash"] - spent_sol
+    cash_final = cash_after_buy + proceeds_sol
+    entry = float(coin.get("usd_market_cap") or spent_sol)
+    multiple = (proceeds_sol / spent_sol) if spent_sol else 0.0
+    exit_mc = entry * multiple if entry else proceeds_sol
+    pos = {
+        "mint": mint,
+        "symbol": (coin.get("symbol") or "").upper(),
+        "name": coin.get("name") or "",
+        "url": coin.get("url") or "",
+        "path": path,
+        "opened_at": now,
+        "cost_sol": spent_sol,
+        "original_qty_sol": spent_sol,
+        "remaining_qty_sol": 0.0,
+        "remaining_frac": 0.0,
+        "entry_mc": entry,
+        "ath_mc": max(entry, exit_mc),
+        "last_mc": exit_mc,
+        "realized_sol": proceeds_sol,
+        "tp1_hit": 0,
+        "tp2_hit": 0,
+        "tp3_hit": 0,
+        "status": "closed",
+        "close_reason": reason,
+        "closed_at": now,
+    }
+    state.upsert_paper_position(pos)
+    state.set_paper_cash(cash_final)
+    state.add_paper_fill(
+        {
+            "mint": mint,
+            "ts": now,
+            "side": "buy",
+            "reason": reason,
+            "frac": 1.0,
+            "multiple": 1.0,
+            "sol": -spent_sol,
+            "cash_after": cash_after_buy,
+            "mc": entry,
+        }
+    )
+    state.add_paper_fill(
+        {
+            "mint": mint,
+            "ts": now,
+            "side": "sell",
+            "reason": reason,
+            "frac": 1.0,
+            "multiple": multiple,
+            "sol": proceeds_sol,
+            "cash_after": cash_final,
+            "mc": exit_mc,
+        }
+    )
+    snap2 = snapshot(state)
+    log.info(
+        "PAPER LIQ %s spent %.3f → %.3f  %+.3f SOL  %s",
+        pos.get("symbol"),
+        spent_sol,
+        proceeds_sol,
+        proceeds_sol - spent_sol,
+        reason,
+    )
+    return Fill(
+        mint=mint,
+        symbol=pos.get("symbol") or "",
+        side="sell",
+        reason=reason,
+        frac=1.0,
+        multiple=multiple,
+        sol=proceeds_sol - spent_sol,
+        cash_after=cash_final,
+        mc=exit_mc,
+        pos=pos,
+        equity=snap2["equity"],
+    )
+
+
 def decide(pos: dict, coin: dict) -> list[tuple[float, str]]:
     """Clip 2x/4x/10x while they hold. Flatten stale bags we missed the dump on."""
     if (pos.get("path") or "") == "strict":
         return _strict_exit(pos, coin)
+    if (pos.get("path") or "") == "kamino":
+        return []
     mc = float(coin.get("usd_market_cap") or 0)
     if mc <= 0:
         return []
